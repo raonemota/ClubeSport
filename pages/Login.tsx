@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useStore } from '../context/StoreContext';
+import { useStore } from '../context/StoreContext.tsx';
 import { useNavigate } from 'react-router-dom';
-import { UserRole } from '../types';
+import { UserRole } from '../types.ts';
 import { Trophy, Lock, Mail, Info } from 'lucide-react';
 
 export const Login = () => {

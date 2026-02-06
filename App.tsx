@@ -1,13 +1,13 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { StoreProvider, useStore } from './context/StoreContext';
-import { Navbar } from './components/Navbar';
-import { Login } from './pages/Login';
-import { AdminPanel } from './pages/admin/AdminPanel';
-import { StudentPortal } from './pages/student/StudentPortal';
-import { StudentProfile } from './pages/student/StudentProfile';
-import { ForcePasswordChange } from './pages/ForcePasswordChange';
-import { UserRole } from './types';
+import { StoreProvider, useStore } from './context/StoreContext.tsx';
+import { Navbar } from './components/Navbar.tsx';
+import { Login } from './pages/Login.tsx';
+import { AdminPanel } from './pages/admin/AdminPanel.tsx';
+import { StudentPortal } from './pages/student/StudentPortal.tsx';
+import { StudentProfile } from './pages/student/StudentProfile.tsx';
+import { ForcePasswordChange } from './pages/ForcePasswordChange.tsx';
+import { UserRole } from './types.ts';
 
 // Protected Route Wrapper
 const ProtectedRoute: React.FC<{ children: React.ReactNode, role?: UserRole }> = ({ children, role }) => {

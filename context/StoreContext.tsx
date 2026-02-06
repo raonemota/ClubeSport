@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { User, Modality, ClassSession, Booking, UserRole, PlanType } from '../types';
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabaseClient';
-import { INITIAL_USERS, INITIAL_MODALITIES, INITIAL_SESSIONS, INITIAL_BOOKINGS } from '../services/mockData';
+import { User, Modality, ClassSession, Booking, UserRole, PlanType } from '../types.ts';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabaseClient.ts';
+import { INITIAL_USERS, INITIAL_MODALITIES, INITIAL_SESSIONS, INITIAL_BOOKINGS } from '../services/mockData.ts';
 
 interface StoreContextType {
   currentUser: User | null;

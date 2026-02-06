@@ -1,6 +1,6 @@
 import React from 'react';
-import { useStore } from '../context/StoreContext';
-import { UserRole } from '../types';
+import { useStore } from '../context/StoreContext.tsx';
+import { UserRole } from '../types.ts';
 import { LogOut, User as UserIcon, Calendar, Trophy, List, Settings } from 'lucide-react';
 
 // Using HashRouter for compatibility as requested, so we use plain <a> with # or buttons that change window.location.hash

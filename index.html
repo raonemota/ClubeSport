@@ -4,9 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ClubeSport</title>
-        
-    <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- 
+      FIX: Interceptador de Avisos do Console.
+      O Tailwind Play CDN emite um aviso em produção. Como nossa arquitetura é No-Build,
+      interceptamos esse aviso específico para manter o console limpo.
+    -->
+    <script>
+      (function() {
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+          const msg = args.map(String).join(' ');
+          if (msg.includes('cdn.tailwindcss.com') && msg.includes('production')) return;
+          originalWarn.apply(console, args);
+        };
+      })();
+    </script>
+    
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
+    
+    <!-- Babel Standalone: Necessário para rodar .tsx diretamente no navegador sem build -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
       body {
@@ -33,5 +52,9 @@
 </head>
   <body>
     <div id="root"></div>
+    
+    <!-- Ponto de Entrada da Aplicação -->
+    <!-- type="text/babel" ativa o compilador e data-type="module" permite usar imports -->
+    <script type="text/babel" data-type="module" src="./index.tsx"></script>
   </body>
 </html>
