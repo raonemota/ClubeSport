@@ -23,7 +23,7 @@
     
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
     
-    <!-- Babel Standalone: Necessário para rodar .tsx diretamente no navegador sem build -->
+    <!-- Babel Standalone: Compila TSX no navegador -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -32,7 +32,6 @@
         font-family: 'Inter', sans-serif;
         background-color: #f3f4f6;
       }
-      /* Previne FOUC (Flash of Unstyled Content) básico */
       .opacity-0 { opacity: 0; }
     </style>
   <script type="importmap">
@@ -53,8 +52,28 @@
   <body>
     <div id="root"></div>
     
-    <!-- Ponto de Entrada da Aplicação -->
-    <!-- type="text/babel" ativa o compilador e data-type="module" permite usar imports -->
-    <script type="text/babel" data-type="module" src="./index.tsx"></script>
+    <!-- 
+      Script de Entrada Inline 
+      Injetamos a lógica de inicialização aqui para garantir que o Babel processe
+      imediatamente sem precisar buscar o arquivo index.tsx externamente, 
+      o que reduz erros de 404 em alguns ambientes de hospedagem estática.
+    -->
+    <script type="text/babel" data-type="module" data-presets="typescript,react">
+      import React from 'react';
+      import ReactDOM from 'react-dom/client';
+      import App from './App.tsx';
+
+      const rootElement = document.getElementById('root');
+      if (!rootElement) {
+        throw new Error("Could not find root element to mount to");
+      }
+
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(
+        <React.StrictMode>
+          <App />
+        </React.StrictMode>
+      );
+    </script>
   </body>
 </html>
