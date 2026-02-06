@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useStore } from '../../context/StoreContext';
-import { supabase } from '../../lib/supabaseClient';
-import { Plus, Trash2, Calendar, Dumbbell, Users, Repeat, X, Clock, ChevronLeft, ChevronRight, Edit2, Save, Upload, Loader2, Search, UserPlus, FileText, Phone, CreditCard, Key, Lock, Settings, Tag } from 'lucide-react';
+import { useStore } from '../../context/StoreContext.js';
+import { supabase } from '../../lib/supabaseClient.js';
+import { Plus, Trash2, Calendar, Dumbbell, Users, Repeat, X, Clock, ChevronLeft, ChevronRight, Edit2, Save, Upload, Loader2, Search, UserPlus, Phone, Key, Settings } from 'lucide-react';
 import { format, addDays, getDay, isSameDay } from 'date-fns';
-import { ConfirmationModal } from '../../components/ConfirmationModal';
-import { ClassSession, Modality, PlanType, UserRole, User } from '../../types';
+import { ConfirmationModal } from '../../components/ConfirmationModal.js';
+import { UserRole } from '../../types.js';
 
 const DAYS_OF_WEEK = [
   { id: 0, label: 'Dom' },
@@ -25,57 +25,45 @@ export const AdminPanel = () => {
       getSessionBookingsCount 
     } = useStore();
   
-  const [activeTab, setActiveTab] = useState<'modalities' | 'schedule' | 'students'>('modalities');
+  const [activeTab, setActiveTab] = useState('modalities');
 
   // Confirmation Modal State
-  const [confirmation, setConfirmation] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [confirmation, setConfirmation] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // --- State for Modalities ---
-  const [editingModalityId, setEditingModalityId] = useState<string | null>(null);
+  const [editingModalityId, setEditingModalityId] = useState(null);
   const [formModName, setFormModName] = useState('');
   const [formModDesc, setFormModDesc] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   
   // --- State for Bulk Generator ---
   const [newSessionModalityId, setNewSessionModalityId] = useState('');
   const [newSessionInstructor, setNewSessionInstructor] = useState('');
-  const [newSessionCategory, setNewSessionCategory] = useState(''); // New Category Field
+  const [newSessionCategory, setNewSessionCategory] = useState('');
   const [newSessionStartDate, setNewSessionStartDate] = useState('');
   const [timeInput, setTimeInput] = useState('');
-  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
+  const [selectedTimes, setSelectedTimes] = useState([]);
   const [newSessionCapacity, setNewSessionCapacity] = useState('10');
-  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [selectedDays, setSelectedDays] = useState([]);
   const [weeksToRepeat, setWeeksToRepeat] = useState('4');
 
   // --- State for Daily Manager (View/Edit) ---
   const [viewDate, setViewDate] = useState(new Date());
   const [viewModalityId, setViewModalityId] = useState('all');
-  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{time: string, instructor: string, capacity: string, category: string}>({ time: '', instructor: '', capacity: '', category: '' });
+  const [editingSessionId, setEditingSessionId] = useState(null);
+  const [editForm, setEditForm] = useState({ time: '', instructor: '', capacity: '', category: '' });
 
   // --- State for Students ---
   const [showStudentForm, setShowStudentForm] = useState(false);
-  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
-  const [studentForm, setStudentForm] = useState<{
-    name: string;
-    phone: string;
-    planType: PlanType;
-    observation: string;
-    email: string;
-    password: string;
-  }>({
+  const [editingStudentId, setEditingStudentId] = useState(null);
+  const [studentForm, setStudentForm] = useState({
       name: '',
       phone: '',
-      planType: PlanType.MENSALISTA,
+      planType: 'Mensalista',
       observation: '',
-      email: '', // Optional in UI
-      password: '' // Optional, for new users only
+      email: '',
+      password: ''
   });
   const [studentSearch, setStudentSearch] = useState('');
 
@@ -83,14 +71,13 @@ export const AdminPanel = () => {
 
   // --- Modality Actions ---
   
-  const startEditingModality = (modality: Modality) => {
+  const startEditingModality = (modality) => {
     setEditingModalityId(modality.id);
     setFormModName(modality.name);
     setFormModDesc(modality.description);
-    setImageFile(null); // Reset file input
+    setImageFile(null); 
     
-    // Reset visual file input
-    const fileInput = document.getElementById('modality-image-input') as HTMLInputElement;
+    const fileInput = document.getElementById('modality-image-input');
     if (fileInput) fileInput.value = '';
   };
 
@@ -100,20 +87,19 @@ export const AdminPanel = () => {
     setFormModDesc('');
     setImageFile(null);
     
-    const fileInput = document.getElementById('modality-image-input') as HTMLInputElement;
+    const fileInput = document.getElementById('modality-image-input');
     if (fileInput) fileInput.value = '';
   };
 
-  const handleModalityFormSubmit = async (e: React.FormEvent) => {
+  const handleModalityFormSubmit = async (e) => {
     e.preventDefault();
     if (!formModName) return;
     
     setUploading(true);
     
     try {
-        let finalImageUrl: string | undefined = undefined;
+        let finalImageUrl = undefined;
 
-        // 1. Upload Logic (Common for Create and Edit if file exists)
         if (imageFile) {
             if (supabase) {
                 const fileExt = imageFile.name.split('.').pop();
@@ -133,23 +119,19 @@ export const AdminPanel = () => {
                     finalImageUrl = data.publicUrl;
                 }
             } else {
-                // Mock mode file
                 alert('Modo de demonstração: Upload de arquivo simulado.');
                 finalImageUrl = `https://picsum.photos/400/200?random=${Date.now()}`;
             }
         }
 
-        // 2. Logic Split: Update vs Create
         if (editingModalityId) {
-            // Updating
             await updateModality(editingModalityId, {
                 name: formModName,
                 description: formModDesc,
-                imageUrl: finalImageUrl // will be undefined if no new file, effectively skipping update in partial
+                imageUrl: finalImageUrl 
             });
             alert('Modalidade atualizada com sucesso!');
         } else {
-            // Creating
             await addModality({
                 name: formModName,
                 description: formModDesc,
@@ -157,7 +139,6 @@ export const AdminPanel = () => {
             });
         }
 
-        // 3. Reset
         cancelEditingModality();
 
     } catch (error) {
@@ -168,7 +149,7 @@ export const AdminPanel = () => {
     }
   };
 
-  const requestDeleteModality = (id: string) => {
+  const requestDeleteModality = (id) => {
     setConfirmation({
         isOpen: true,
         title: 'Excluir Modalidade',
@@ -178,7 +159,7 @@ export const AdminPanel = () => {
   };
 
   // --- Bulk Generator Actions ---
-  const toggleDay = (dayId: number) => {
+  const toggleDay = (dayId) => {
     if (selectedDays.includes(dayId)) {
         setSelectedDays(selectedDays.filter(d => d !== dayId));
     } else {
@@ -194,11 +175,11 @@ export const AdminPanel = () => {
     }
   };
 
-  const removeTime = (timeToRemove: string) => {
+  const removeTime = (timeToRemove) => {
       setSelectedTimes(selectedTimes.filter(t => t !== timeToRemove));
   };
 
-  const handleAddSessions = (e: React.FormEvent) => {
+  const handleAddSessions = (e) => {
     e.preventDefault();
     if (!newSessionModalityId || !newSessionStartDate || selectedTimes.length === 0 || selectedDays.length === 0) {
         alert("Preencha todos os campos obrigatórios, selecione dias e adicione horários.");
@@ -221,7 +202,7 @@ export const AdminPanel = () => {
     }
   };
 
-  const generateSessions = (startDate: Date, durationWeeks: number) => {
+  const generateSessions = (startDate, durationWeeks) => {
     for (let i = 0; i < durationWeeks * 7; i++) {
         const currentDate = addDays(startDate, i);
         const dayOfWeek = getDay(currentDate);
@@ -246,7 +227,7 @@ export const AdminPanel = () => {
   };
 
   // --- Daily Manager Actions ---
-  const requestDeleteSession = (id: string) => {
+  const requestDeleteSession = (id) => {
     setConfirmation({
       isOpen: true,
       title: 'Cancelar Aula',
@@ -255,7 +236,7 @@ export const AdminPanel = () => {
     });
   };
 
-  const startEditing = (session: ClassSession) => {
+  const startEditing = (session) => {
       setEditingSessionId(session.id);
       setEditForm({
           time: format(new Date(session.startTime), 'HH:mm'),
@@ -269,7 +250,7 @@ export const AdminPanel = () => {
       setEditingSessionId(null);
   };
 
-  const saveEditing = (originalSession: ClassSession) => {
+  const saveEditing = (originalSession) => {
       const [hours, minutes] = editForm.time.split(':').map(Number);
       const originalDate = new Date(originalSession.startTime);
       const newDate = new Date(originalDate);
@@ -285,12 +266,12 @@ export const AdminPanel = () => {
   };
 
   // --- Student Actions ---
-  const startEditingStudent = (student: User) => {
+  const startEditingStudent = (student) => {
       setEditingStudentId(student.id);
       setStudentForm({
           name: student.name,
           phone: student.phone || '',
-          planType: (student.planType as PlanType) || PlanType.MENSALISTA,
+          planType: student.planType || 'Mensalista',
           observation: student.observation || '',
           email: student.email,
           password: ''
@@ -299,7 +280,7 @@ export const AdminPanel = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const requestDeleteStudent = (student: User) => {
+  const requestDeleteStudent = (student) => {
       setConfirmation({
           isOpen: true,
           title: 'Excluir Aluno',
@@ -310,7 +291,7 @@ export const AdminPanel = () => {
       });
   };
 
-  const requestResetPassword = (student: User) => {
+  const requestResetPassword = (student) => {
       setConfirmation({
           isOpen: true,
           title: 'Redefinir Senha',
@@ -328,11 +309,11 @@ export const AdminPanel = () => {
 
   const cancelEditingStudent = () => {
       setEditingStudentId(null);
-      setStudentForm({ name: '', phone: '', planType: PlanType.MENSALISTA, observation: '', email: '', password: '' });
+      setStudentForm({ name: '', phone: '', planType: 'Mensalista', observation: '', email: '', password: '' });
       setShowStudentForm(false);
   };
 
-  const handleRegisterStudent = async (e: React.FormEvent) => {
+  const handleRegisterStudent = async (e) => {
       e.preventDefault();
       setUploading(true);
       try {
@@ -357,7 +338,7 @@ export const AdminPanel = () => {
 
               if (result.success) {
                   alert(result.message || 'Aluno cadastrado com sucesso!');
-                  setStudentForm({ name: '', phone: '', planType: PlanType.MENSALISTA, observation: '', email: '', password: '' });
+                  setStudentForm({ name: '', phone: '', planType: 'Mensalista', observation: '', email: '', password: '' });
                   setShowStudentForm(false);
               } else {
                   alert(result.message || 'Erro ao cadastrar aluno.');
@@ -368,7 +349,6 @@ export const AdminPanel = () => {
       }
   };
 
-  // Filters
   const dailySessions = sessions.filter(s => {
       const isSameDate = isSameDay(new Date(s.startTime), viewDate);
       const isSameModality = viewModalityId === 'all' || s.modalityId === viewModalityId;
@@ -397,7 +377,6 @@ export const AdminPanel = () => {
         <p className="text-gray-500 mt-2">Gerencie modalidades, grade horária e alunos do clube.</p>
       </div>
 
-      {/* Tabs */}
       <div className="border-b border-gray-200 mb-8 overflow-x-auto">
         <nav className="-mb-px flex space-x-8">
           <button
@@ -424,10 +403,8 @@ export const AdminPanel = () => {
         </nav>
       </div>
 
-      {/* Modalities Tab */}
       {activeTab === 'modalities' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Create/Edit Form */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -522,7 +499,6 @@ export const AdminPanel = () => {
             </form>
           </div>
 
-          {/* List */}
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {modalities.map(modality => (
               <div key={modality.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col transition-all ${editingModalityId === modality.id ? 'ring-2 ring-indigo-500 border-indigo-500' : 'border-gray-100'}`}>
@@ -560,14 +536,9 @@ export const AdminPanel = () => {
         </div>
       )}
 
-      {/* Schedule Tab */}
       {activeTab === 'schedule' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* Left Column: Generator & Config */}
           <div className="lg:col-span-4 space-y-6">
-            
-            {/* New: Schedule Rules Configuration */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <Settings className="w-5 h-5 text-indigo-600" /> Regra de Liberação
@@ -729,10 +700,8 @@ export const AdminPanel = () => {
             </div>
           </div>
 
-          {/* Right Column: Daily Manager */}
           <div className="lg:col-span-8 space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                {/* Daily Manager Header */}
                 <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-2 bg-white rounded-lg p-1 shadow-sm border border-gray-200">
                         <button 
@@ -769,7 +738,6 @@ export const AdminPanel = () => {
                     </select>
                 </div>
 
-                {/* Daily Sessions List */}
                 <div className="p-6">
                      <div className="space-y-4">
                         {dailySessions.map(session => {
@@ -893,11 +861,8 @@ export const AdminPanel = () => {
         </div>
       )}
 
-      {/* Students Tab */}
       {activeTab === 'students' && (
           <div className="space-y-6">
-              
-              {/* Header Actions */}
               <div className="flex flex-col sm:flex-row justify-between gap-4">
                   <div className="relative max-w-sm w-full">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -927,7 +892,6 @@ export const AdminPanel = () => {
                   </button>
               </div>
 
-              {/* Registration/Edit Form */}
               {showStudentForm && (
                   <div className="bg-white rounded-xl shadow-sm border border-indigo-100 p-6 animate-in slide-in-from-top-4 duration-300 relative">
                       {editingStudentId && (
@@ -975,7 +939,7 @@ export const AdminPanel = () => {
                               <label className="block text-sm font-medium text-gray-700">Tipo de Plano</label>
                               <select
                                   value={studentForm.planType}
-                                  onChange={(e) => setStudentForm({ ...studentForm, planType: e.target.value as PlanType })}
+                                  onChange={(e) => setStudentForm({ ...studentForm, planType: e.target.value })}
                                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
                               >
                                   <option value="Wellhub">Wellhub (Gympass)</option>
@@ -1027,7 +991,6 @@ export const AdminPanel = () => {
                   </div>
               )}
 
-              {/* Students List */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">

@@ -1,6 +1,6 @@
-import { UserRole, User, Modality, ClassSession, Booking } from '../types';
+import { UserRole } from '../types.js';
 
-export const INITIAL_USERS: User[] = [
+export const INITIAL_USERS = [
   {
     id: '1',
     name: 'Admin Master',
@@ -26,7 +26,7 @@ export const INITIAL_USERS: User[] = [
   }
 ];
 
-export const INITIAL_MODALITIES: Modality[] = [
+export const INITIAL_MODALITIES = [
   {
     id: 'm1',
     name: 'Natação',
@@ -47,12 +47,12 @@ export const INITIAL_MODALITIES: Modality[] = [
   }
 ];
 
-// Generate some sessions for today and tomorrow
+// Gerar sessões para hoje e amanhã
 const today = new Date();
 const tomorrow = new Date(today);
 tomorrow.setDate(tomorrow.getDate() + 1);
 
-export const INITIAL_SESSIONS: ClassSession[] = [
+export const INITIAL_SESSIONS = [
   {
     id: 's1',
     modalityId: 'm1',
@@ -90,11 +90,11 @@ export const INITIAL_SESSIONS: ClassSession[] = [
   }
 ];
 
-export const INITIAL_BOOKINGS: Booking[] = [
+export const INITIAL_BOOKINGS = [
   {
     id: 'b1',
     sessionId: 's1',
-    userId: '3', // Maria already booked swimming
+    userId: '3',
     status: 'CONFIRMED',
     bookedAt: new Date().toISOString()
   }
