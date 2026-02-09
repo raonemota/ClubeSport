@@ -8,8 +8,8 @@ export default defineConfig({
   },
   esbuild: {
     loader: "jsx",
-    include: /src\/.*\.js$/, // Process .js files in src as JSX
-    exclude: /node_modules/, // Do not process node_modules
+    include: /.*\.js$/, // Process all .js files as JSX
+    exclude: /node_modules/, // Ignore node_modules
   },
   optimizeDeps: {
     esbuildOptions: {

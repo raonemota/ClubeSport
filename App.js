@@ -35,6 +35,17 @@ const ProtectedRoute = ({ children, role }) => {
   return <>{children}</>;
 };
 
+const ConditionalNavbar = () => {
+    const location = useLocation();
+    const { currentUser } = useStore();
+    
+    if (location.pathname === '/') return null;
+    if (location.pathname === '/change-password') return null;
+    if (currentUser?.mustChangePassword) return null;
+
+    return <Navbar />;
+};
+
 const AppContent = () => {
   return (
     <Router>
@@ -95,17 +106,6 @@ const AppContent = () => {
       </div>
     </Router>
   );
-};
-
-const ConditionalNavbar = () => {
-    const location = useLocation();
-    const { currentUser } = useStore();
-    
-    if (location.pathname === '/') return null;
-    if (location.pathname === '/change-password') return null;
-    if (currentUser?.mustChangePassword) return null;
-
-    return <Navbar />;
 };
 
 const App = () => {
