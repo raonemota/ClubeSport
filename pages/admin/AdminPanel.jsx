@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { supabase } from '../../lib/supabaseClient.js';
-import { Plus, Trash2, Calendar, Dumbbell, Users, Repeat, X, Clock, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Edit2, Save, Upload, Loader2, Search, UserPlus, Phone, Key, Settings, FileText, ClipboardList, Filter } from 'lucide-react';
+import { Plus, Trash2, Calendar, Dumbbell, Users, Repeat, X, Clock, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Edit2, Save, Upload, Loader2, Search, UserPlus, Phone, Key, Settings, FileText, ClipboardList, Filter, LayoutDashboard, Menu } from 'lucide-react';
 import { format, addDays, getDay, isSameDay, parseISO } from 'date-fns';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { UserRole } from '../../types.js';
@@ -25,12 +25,15 @@ export const AdminPanel = () => {
       getSessionBookingsCount 
     } = useStore();
   
-  const [activeTab, setActiveTab] = useState('modalities');
+  // Alterado: Relatórios é a página padrão
+  const [activeTab, setActiveTab] = useState('reports');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Confirmation Modal State
   const [confirmation, setConfirmation] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // --- State for Modalities ---
+  const [showModalityForm, setShowModalityForm] = useState(false);
   const [editingModalityId, setEditingModalityId] = useState(null);
   const [formModName, setFormModName] = useState('');
   const [formModDesc, setFormModDesc] = useState('');
@@ -70,7 +73,8 @@ export const AdminPanel = () => {
   // --- State for Reports ---
   const [reportDate, setReportDate] = useState(new Date());
   const [reportModalityId, setReportModalityId] = useState('all');
-  const [collapsedReports, setCollapsedReports] = useState(new Set());
+  // Alterado: Usando expandedReports em vez de collapsedReports para começar fechado
+  const [expandedReports, setExpandedReports] = useState(new Set());
 
   const closeConfirmation = () => setConfirmation({ ...confirmation, isOpen: false });
 
@@ -81,6 +85,7 @@ export const AdminPanel = () => {
     setFormModName(modality.name);
     setFormModDesc(modality.description);
     setImageFile(null); 
+    setShowModalityForm(true); // Abre o formulário ao editar
     
     const fileInput = document.getElementById('modality-image-input');
     if (fileInput) fileInput.value = '';
@@ -91,6 +96,7 @@ export const AdminPanel = () => {
     setFormModName('');
     setFormModDesc('');
     setImageFile(null);
+    setShowModalityForm(false);
     
     const fileInput = document.getElementById('modality-image-input');
     if (fileInput) fileInput.value = '';
@@ -374,18 +380,36 @@ export const AdminPanel = () => {
       return isDateMatch && isModalityMatch;
   }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
-  const toggleReportCollapse = (sessionId) => {
-      const newSet = new Set(collapsedReports);
+  // Lógica invertida: expandir em vez de recolher
+  const toggleReportExpansion = (sessionId) => {
+      const newSet = new Set(expandedReports);
       if (newSet.has(sessionId)) {
           newSet.delete(sessionId);
       } else {
           newSet.add(sessionId);
       }
-      setCollapsedReports(newSet);
+      setExpandedReports(newSet);
   };
 
+  const NavButton = ({ tabId, icon: Icon, label }) => (
+    <button
+      onClick={() => {
+        setActiveTab(tabId);
+        setIsMobileMenuOpen(false);
+      }}
+      className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors flex items-center gap-3 ${
+        activeTab === tabId 
+        ? 'bg-indigo-50 text-indigo-700' 
+        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+      }`}
+    >
+      <Icon className={`w-5 h-5 ${activeTab === tabId ? 'text-indigo-600' : 'text-gray-400'}`} />
+      {label}
+    </button>
+  );
+
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       <ConfirmationModal 
         isOpen={confirmation.isOpen}
         onClose={closeConfirmation}
@@ -394,165 +418,194 @@ export const AdminPanel = () => {
         message={confirmation.message}
       />
 
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Painel Administrativo</h1>
-        <p className="text-gray-500 mt-2">Gerencie modalidades, grade horária e alunos do clube.</p>
+      {/* Mobile Toggle */}
+      <div className="md:hidden bg-white p-4 flex items-center justify-between border-b">
+        <span className="font-bold text-gray-700">Menu Administrativo</span>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600">
+            {isMobileMenuOpen ? <X /> : <Menu />}
+        </button>
       </div>
 
-      <div className="border-b border-gray-200 mb-8 overflow-x-auto">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab('modalities')}
-            className={`${activeTab === 'modalities' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
-          >
-            <Dumbbell className="w-4 h-4" />
-            Modalidades
-          </button>
-          <button
-            onClick={() => setActiveTab('schedule')}
-            className={`${activeTab === 'schedule' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
-          >
-            <Calendar className="w-4 h-4" />
-            Grade Horária
-          </button>
-          <button
-            onClick={() => setActiveTab('students')}
-            className={`${activeTab === 'students' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
-          >
-            <Users className="w-4 h-4" />
-            Alunos
-          </button>
-          <button
-            onClick={() => setActiveTab('reports')}
-            className={`${activeTab === 'reports' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
-          >
-            <FileText className="w-4 h-4" />
-            Relatórios
-          </button>
-        </nav>
-      </div>
+      {/* Lateral Sidebar */}
+      <aside className={`
+        w-full md:w-64 bg-white border-r border-gray-200 flex-shrink-0 
+        md:block ${isMobileMenuOpen ? 'block' : 'hidden'}
+      `}>
+        <div className="p-6">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Gerenciamento</h2>
+            <nav className="space-y-1">
+                <NavButton tabId="reports" icon={FileText} label="Relatórios" />
+                <NavButton tabId="schedule" icon={Calendar} label="Grade Horária" />
+                <NavButton tabId="students" icon={Users} label="Alunos" />
+                <NavButton tabId="modalities" icon={Dumbbell} label="Modalidades" />
+            </nav>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
+      
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-8">
+            <h1 className="text-2xl font-bold text-gray-900">
+                {activeTab === 'reports' && 'Relatórios e Presença'}
+                {activeTab === 'schedule' && 'Gerenciar Grade'}
+                {activeTab === 'students' && 'Gestão de Alunos'}
+                {activeTab === 'modalities' && 'Configurar Modalidades'}
+            </h1>
+        </div>
 
       {activeTab === 'modalities' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit transition-all duration-300">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                    {editingModalityId ? 'Editar Modalidade' : 'Nova Modalidade'}
-                </h3>
-                {editingModalityId && (
-                    <button 
-                        onClick={cancelEditingModality}
-                        className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 bg-gray-100 px-2 py-1 rounded"
-                    >
-                        <X className="w-3 h-3" /> Cancelar
-                    </button>
+        <div className="space-y-8">
+            {/* Collapsible Creation Form */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                {!showModalityForm && (
+                    <div className="p-6 flex items-center justify-between bg-gray-50/50">
+                        <div>
+                            <h3 className="text-lg font-medium text-gray-900">Cadastrar Nova Modalidade</h3>
+                            <p className="text-sm text-gray-500">Adicione novos esportes ou atividades ao clube.</p>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                cancelEditingModality(); // Reseta estados de edição
+                                setShowModalityForm(true);
+                            }}
+                            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
+                        >
+                            <Plus className="w-4 h-4 mr-2" /> Nova Modalidade
+                        </button>
+                    </div>
+                )}
+
+                {showModalityForm && (
+                    <div className="p-6 animate-in slide-in-from-top-2">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                {editingModalityId ? 'Editar Modalidade' : 'Nova Modalidade'}
+                            </h3>
+                            <button 
+                                onClick={cancelEditingModality}
+                                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 bg-gray-100 px-3 py-1.5 rounded-md"
+                            >
+                                <X className="w-4 h-4" /> Fechar
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleModalityFormSubmit} className="space-y-4 max-w-2xl">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Nome do Esporte</label>
+                            <input
+                            type="text"
+                            value={formModName}
+                            onChange={(e) => setFormModName(e.target.value)}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="Ex: Natação"
+                            required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Descrição</label>
+                            <textarea
+                            value={formModDesc}
+                            onChange={(e) => setFormModDesc(e.target.value)}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            rows={3}
+                            placeholder="Descrição breve..."
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {editingModalityId ? 'Alterar Capa (Opcional)' : 'Imagem de Capa'}
+                            </label>
+                            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:bg-gray-50 transition-colors relative">
+                                <div className="space-y-1 text-center">
+                                    <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                                    <div className="flex text-sm text-gray-600">
+                                        <label htmlFor="modality-image-input" className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none">
+                                            <span>Upload de arquivo</span>
+                                            <input 
+                                                id="modality-image-input" 
+                                                name="modality-image-input" 
+                                                type="file" 
+                                                className="sr-only" 
+                                                accept="image/*"
+                                                onChange={(e) => {
+                                                    if (e.target.files && e.target.files[0]) {
+                                                        setImageFile(e.target.files[0]);
+                                                    }
+                                                }}
+                                            />
+                                        </label>
+                                        <p className="pl-1">ou arraste</p>
+                                    </div>
+                                    <p className="text-xs text-gray-500">PNG, JPG, GIF até 5MB</p>
+                                </div>
+                            </div>
+                            {imageFile && (
+                                <div className="mt-2 text-sm text-green-600 flex items-center gap-1">
+                                    <span className="font-medium">Selecionado:</span> {imageFile.name}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex justify-end gap-3 pt-4">
+                            <button
+                                type="button"
+                                onClick={cancelEditingModality}
+                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={uploading}
+                                className={`flex items-center justify-center gap-2 text-white px-6 py-2 rounded-md transition disabled:opacity-50 ${editingModalityId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-green-600 hover:bg-green-700'}`}
+                            >
+                                {uploading ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" /> Salvando...
+                                    </>
+                                ) : editingModalityId ? (
+                                    <>
+                                        <Save className="w-4 h-4" /> Salvar Alterações
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus className="w-4 h-4" /> Criar Modalidade
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                        </form>
+                    </div>
                 )}
             </div>
-            
-            <form onSubmit={handleModalityFormSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Nome do Esporte</label>
-                <input
-                  type="text"
-                  value={formModName}
-                  onChange={(e) => setFormModName(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Ex: Natação"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Descrição</label>
-                <textarea
-                  value={formModDesc}
-                  onChange={(e) => setFormModDesc(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  rows={3}
-                  placeholder="Descrição breve..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {editingModalityId ? 'Alterar Capa (Opcional)' : 'Imagem de Capa'}
-                </label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:bg-gray-50 transition-colors relative">
-                    <div className="space-y-1 text-center">
-                        <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                        <div className="flex text-sm text-gray-600">
-                            <label htmlFor="modality-image-input" className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none">
-                                <span>Upload de arquivo</span>
-                                <input 
-                                    id="modality-image-input" 
-                                    name="modality-image-input" 
-                                    type="file" 
-                                    className="sr-only" 
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                        if (e.target.files && e.target.files[0]) {
-                                            setImageFile(e.target.files[0]);
-                                        }
-                                    }}
-                                />
-                            </label>
-                            <p className="pl-1">ou arraste</p>
-                        </div>
-                        <p className="text-xs text-gray-500">PNG, JPG, GIF até 5MB</p>
-                    </div>
-                </div>
-                {imageFile && (
-                    <div className="mt-2 text-sm text-green-600 flex items-center gap-1">
-                        <span className="font-medium">Selecionado:</span> {imageFile.name}
-                    </div>
-                )}
-              </div>
-              
-              <button
-                type="submit"
-                disabled={uploading}
-                className={`w-full flex items-center justify-center gap-2 text-white px-4 py-2 rounded-md transition disabled:opacity-50 ${editingModalityId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-green-600 hover:bg-green-700'}`}
-              >
-                {uploading ? (
-                    <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> Salvando...
-                    </>
-                ) : editingModalityId ? (
-                    <>
-                        <Save className="w-4 h-4" /> Salvar Alterações
-                    </>
-                ) : (
-                    <>
-                        <Plus className="w-4 h-4" /> Criar Modalidade
-                    </>
-                )}
-              </button>
-            </form>
-          </div>
 
-          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {modalities.map(modality => (
               <div key={modality.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col transition-all ${editingModalityId === modality.id ? 'ring-2 ring-indigo-500 border-indigo-500' : 'border-gray-100'}`}>
-                <div className="h-32 bg-gray-200 relative">
+                <div className="h-40 bg-gray-200 relative group">
                     <img src={modality.imageUrl} alt={modality.name} className="w-full h-full object-cover" />
-                    <div className="absolute top-2 right-2 flex gap-1">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                         <button 
                             onClick={() => startEditingModality(modality)}
-                            className="bg-white/90 p-1.5 rounded-full text-indigo-600 hover:bg-indigo-50 transition shadow-sm"
+                            className="bg-white text-indigo-600 p-2 rounded-full hover:bg-indigo-50 transition shadow-lg transform hover:scale-105"
                             title="Editar modalidade"
                         >
-                            <Edit2 className="w-4 h-4" />
+                            <Edit2 className="w-5 h-5" />
                         </button>
                         <button 
                             onClick={() => requestDeleteModality(modality.id)}
-                            className="bg-white/90 p-1.5 rounded-full text-red-600 hover:bg-red-50 transition shadow-sm"
+                            className="bg-white text-red-600 p-2 rounded-full hover:bg-red-50 transition shadow-lg transform hover:scale-105"
                             title="Excluir modalidade"
                         >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
                 <div className="p-4 flex-1">
-                  <h3 className="font-bold text-gray-900">{modality.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{modality.description}</p>
+                  <h3 className="font-bold text-gray-900 text-lg">{modality.name}</h3>
+                  <p className="text-sm text-gray-500 mt-2 line-clamp-3">{modality.description}</p>
                 </div>
               </div>
             ))}
@@ -566,8 +619,8 @@ export const AdminPanel = () => {
       )}
 
       {activeTab === 'schedule' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-4 space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          <div className="xl:col-span-1 space-y-6">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <Settings className="w-5 h-5 text-indigo-600" /> Regra de Liberação
@@ -729,7 +782,7 @@ export const AdminPanel = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-8 space-y-6">
+          <div className="xl:col-span-2 space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-2 bg-white rounded-lg p-1 shadow-sm border border-gray-200">
@@ -1164,13 +1217,15 @@ export const AdminPanel = () => {
                       {reportSessions.map(session => {
                           const modality = modalities.find(m => m.id === session.modalityId);
                           const sessionBookings = bookings.filter(b => b.sessionId === session.id && b.status === 'CONFIRMED');
-                          const isCollapsed = collapsedReports.has(session.id);
+                          
+                          // Agora usamos expandedReports para controlar o que ESTÁ ABERTO
+                          const isExpanded = expandedReports.has(session.id);
                           
                           return (
                               <div key={session.id} className="border border-gray-200 rounded-lg overflow-hidden transition-all duration-200">
                                   <div 
                                     className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                                    onClick={() => toggleReportCollapse(session.id)}
+                                    onClick={() => toggleReportExpansion(session.id)}
                                   >
                                       <div className="flex items-center gap-3">
                                           <div className="bg-indigo-600 text-white px-3 py-1 rounded text-sm font-bold">
@@ -1193,12 +1248,12 @@ export const AdminPanel = () => {
                                             {sessionBookings.length} / {session.capacity} Alunos
                                         </div>
                                         <div className="text-gray-400">
-                                            {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                                            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                                         </div>
                                       </div>
                                   </div>
                                   
-                                  {!isCollapsed && (
+                                  {isExpanded && (
                                     <div className="overflow-x-auto animate-in fade-in duration-200">
                                         <table className="min-w-full divide-y divide-gray-200">
                                             <thead className="bg-white">
@@ -1258,6 +1313,8 @@ export const AdminPanel = () => {
               </div>
           </div>
       )}
+      </div>
+      </main>
     </div>
   );
 };
