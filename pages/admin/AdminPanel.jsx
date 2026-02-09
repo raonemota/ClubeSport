@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { supabase } from '../../lib/supabaseClient.js';
-import { Plus, Trash2, Calendar, Dumbbell, Users, Repeat, X, Clock, ChevronLeft, ChevronRight, Edit2, Save, Upload, Loader2, Search, UserPlus, Phone, Key, Settings, FileText, ClipboardList } from 'lucide-react';
+import { Plus, Trash2, Calendar, Dumbbell, Users, Repeat, X, Clock, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Edit2, Save, Upload, Loader2, Search, UserPlus, Phone, Key, Settings, FileText, ClipboardList, Filter } from 'lucide-react';
 import { format, addDays, getDay, isSameDay, parseISO } from 'date-fns';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { UserRole } from '../../types.js';
@@ -69,6 +69,8 @@ export const AdminPanel = () => {
 
   // --- State for Reports ---
   const [reportDate, setReportDate] = useState(new Date());
+  const [reportModalityId, setReportModalityId] = useState('all');
+  const [collapsedReports, setCollapsedReports] = useState(new Set());
 
   const closeConfirmation = () => setConfirmation({ ...confirmation, isOpen: false });
 
@@ -367,8 +369,20 @@ export const AdminPanel = () => {
 
   // --- Report Helpers ---
   const reportSessions = sessions.filter(s => {
-      return isSameDay(new Date(s.startTime), reportDate);
+      const isDateMatch = isSameDay(new Date(s.startTime), reportDate);
+      const isModalityMatch = reportModalityId === 'all' || s.modalityId === reportModalityId;
+      return isDateMatch && isModalityMatch;
   }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+  const toggleReportCollapse = (sessionId) => {
+      const newSet = new Set(collapsedReports);
+      if (newSet.has(sessionId)) {
+          newSet.delete(sessionId);
+      } else {
+          newSet.add(sessionId);
+      }
+      setCollapsedReports(newSet);
+  };
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -1095,29 +1109,50 @@ export const AdminPanel = () => {
       {activeTab === 'reports' && (
           <div className="space-y-6">
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-4 mb-6">
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Selecione o Dia</label>
-                          <div className="flex items-center gap-2">
-                                <button 
-                                    onClick={() => setReportDate(addDays(reportDate, -1))}
-                                    className="p-2 hover:bg-gray-100 rounded-lg border border-gray-300"
+                  <div className="flex flex-col md:flex-row items-end md:items-center justify-between gap-4 mb-6">
+                      <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Selecione o Dia</label>
+                            <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={() => setReportDate(addDays(reportDate, -1))}
+                                        className="p-2 hover:bg-gray-100 rounded-lg border border-gray-300"
+                                    >
+                                        <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                    </button>
+                                    <input 
+                                        type="date" 
+                                        value={format(reportDate, 'yyyy-MM-dd')}
+                                        onChange={(e) => setReportDate(parseISO(e.target.value))}
+                                        className="block border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium text-gray-900"
+                                    />
+                                    <button 
+                                        onClick={() => setReportDate(addDays(reportDate, 1))}
+                                        className="p-2 hover:bg-gray-100 rounded-lg border border-gray-300"
+                                    >
+                                        <ChevronRight className="w-4 h-4 text-gray-600" />
+                                    </button>
+                            </div>
+                        </div>
+
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar Modalidade</label>
+                             <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Filter className="h-4 w-4 text-gray-400" />
+                                </div>
+                                <select
+                                    value={reportModalityId}
+                                    onChange={(e) => setReportModalityId(e.target.value)}
+                                    className="block w-full pl-10 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                                 >
-                                    <ChevronLeft className="w-4 h-4 text-gray-600" />
-                                </button>
-                                <input 
-                                    type="date" 
-                                    value={format(reportDate, 'yyyy-MM-dd')}
-                                    onChange={(e) => setReportDate(parseISO(e.target.value))}
-                                    className="block border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium text-gray-900"
-                                />
-                                <button 
-                                    onClick={() => setReportDate(addDays(reportDate, 1))}
-                                    className="p-2 hover:bg-gray-100 rounded-lg border border-gray-300"
-                                >
-                                    <ChevronRight className="w-4 h-4 text-gray-600" />
-                                </button>
-                          </div>
+                                    <option value="all">Todas as Modalidades</option>
+                                    {modalities.map(m => (
+                                        <option key={m.id} value={m.id}>{m.name}</option>
+                                    ))}
+                                </select>
+                             </div>
+                        </div>
                       </div>
                       <div className="text-right">
                             <span className="text-xs text-gray-500 uppercase tracking-wide font-bold">Total de Aulas</span>
@@ -1129,65 +1164,83 @@ export const AdminPanel = () => {
                       {reportSessions.map(session => {
                           const modality = modalities.find(m => m.id === session.modalityId);
                           const sessionBookings = bookings.filter(b => b.sessionId === session.id && b.status === 'CONFIRMED');
+                          const isCollapsed = collapsedReports.has(session.id);
                           
                           return (
-                              <div key={session.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                              <div key={session.id} className="border border-gray-200 rounded-lg overflow-hidden transition-all duration-200">
+                                  <div 
+                                    className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                                    onClick={() => toggleReportCollapse(session.id)}
+                                  >
                                       <div className="flex items-center gap-3">
                                           <div className="bg-indigo-600 text-white px-3 py-1 rounded text-sm font-bold">
                                               {format(new Date(session.startTime), 'HH:mm')}
                                           </div>
                                           <div>
-                                              <h3 className="font-bold text-gray-900">{modality?.name}</h3>
+                                              <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-gray-900">{modality?.name}</h3>
+                                                {session.category && (
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 uppercase tracking-wide border border-blue-200">
+                                                        {session.category}
+                                                    </span>
+                                                )}
+                                              </div>
                                               <p className="text-xs text-gray-500">Instrutor: {session.instructor}</p>
                                           </div>
                                       </div>
-                                      <div className="text-sm font-medium text-gray-600">
-                                          {sessionBookings.length} / {session.capacity} Alunos
+                                      <div className="flex items-center gap-4">
+                                        <div className="text-sm font-medium text-gray-600">
+                                            {sessionBookings.length} / {session.capacity} Alunos
+                                        </div>
+                                        <div className="text-gray-400">
+                                            {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                                        </div>
                                       </div>
                                   </div>
                                   
-                                  <div className="overflow-x-auto">
-                                      <table className="min-w-full divide-y divide-gray-200">
-                                          <thead className="bg-white">
-                                              <tr>
-                                                  <th className="px-6 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Aluno</th>
-                                                  <th className="px-6 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Plano</th>
-                                                  <th className="px-6 py-2 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Reserva Feita em</th>
-                                              </tr>
-                                          </thead>
-                                          <tbody className="bg-white divide-y divide-gray-100">
-                                              {sessionBookings.map(booking => {
-                                                  const user = users.find(u => u.id === booking.userId);
-                                                  return (
-                                                      <tr key={booking.id}>
-                                                          <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                              {user?.name || 'Usuário Removido'}
-                                                          </td>
-                                                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                                  ${user?.planType === 'Wellhub' ? 'bg-red-100 text-red-800' : 
-                                                                    user?.planType === 'Totalpass' ? 'bg-green-100 text-green-800' : 
-                                                                    user?.planType === 'Mensalista' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
-                                                                  {user?.planType || '-'}
-                                                              </span>
-                                                          </td>
-                                                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
-                                                              {format(new Date(booking.bookedAt), "dd/MM 'às' HH:mm")}
-                                                          </td>
-                                                      </tr>
-                                                  );
-                                              })}
-                                              {sessionBookings.length === 0 && (
-                                                  <tr>
-                                                      <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-400 italic">
-                                                          Nenhum aluno inscrito nesta aula.
-                                                      </td>
-                                                  </tr>
-                                              )}
-                                          </tbody>
-                                      </table>
-                                  </div>
+                                  {!isCollapsed && (
+                                    <div className="overflow-x-auto animate-in fade-in duration-200">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-white">
+                                                <tr>
+                                                    <th className="px-6 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Aluno</th>
+                                                    <th className="px-6 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Plano</th>
+                                                    <th className="px-6 py-2 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Reserva Feita em</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-100">
+                                                {sessionBookings.map(booking => {
+                                                    const user = users.find(u => u.id === booking.userId);
+                                                    return (
+                                                        <tr key={booking.id}>
+                                                            <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                                {user?.name || 'Usuário Removido'}
+                                                            </td>
+                                                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                                    ${user?.planType === 'Wellhub' ? 'bg-red-100 text-red-800' : 
+                                                                        user?.planType === 'Totalpass' ? 'bg-green-100 text-green-800' : 
+                                                                        user?.planType === 'Mensalista' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                                    {user?.planType || '-'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
+                                                                {format(new Date(booking.bookedAt), "dd/MM 'às' HH:mm")}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                {sessionBookings.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-400 italic">
+                                                            Nenhum aluno inscrito nesta aula.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                  )}
                               </div>
                           );
                       })}
@@ -1198,7 +1251,7 @@ export const AdminPanel = () => {
                                   <ClipboardList className="h-full w-full" />
                               </div>
                               <h3 className="mt-2 text-sm font-medium text-gray-900">Sem atividades</h3>
-                              <p className="mt-1 text-sm text-gray-500">Não há aulas agendadas para o dia selecionado.</p>
+                              <p className="mt-1 text-sm text-gray-500">Não há aulas encontradas com os filtros selecionados.</p>
                           </div>
                       )}
                   </div>
