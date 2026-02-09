@@ -1,12 +1,12 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { StoreProvider, useStore } from './context/StoreContext.js';
-import { Navbar } from './components/Navbar.js';
-import { Login } from './pages/Login.js';
-import { AdminPanel } from './pages/admin/AdminPanel.js';
-import { StudentPortal } from './pages/student/StudentPortal.js';
-import { StudentProfile } from './pages/student/StudentProfile.js';
-import { ForcePasswordChange } from './pages/ForcePasswordChange.js';
+import { StoreProvider, useStore } from './context/StoreContext';
+import { Navbar } from './components/Navbar';
+import { Login } from './pages/Login';
+import { AdminPanel } from './pages/admin/AdminPanel';
+import { StudentPortal } from './pages/student/StudentPortal';
+import { StudentProfile } from './pages/student/StudentProfile';
+import { ForcePasswordChange } from './pages/ForcePasswordChange';
 import { UserRole } from './types.js';
 
 // Protected Route Wrapper

@@ -3,7 +3,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    extensions: ['.js', '.jsx', '.json']
+  },
   build: {
-    outDir: 'dist', // Garante que a saída seja na pasta dist
+    outDir: 'dist',
   }
 });
