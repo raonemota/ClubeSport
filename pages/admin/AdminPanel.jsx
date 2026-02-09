@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { supabase } from '../../lib/supabaseClient.js';
-import { Plus, Trash2, Calendar, Dumbbell, Users, Repeat, X, Clock, ChevronLeft, ChevronRight, Edit2, Save, Upload, Loader2, Search, UserPlus, Phone, Key, Settings } from 'lucide-react';
-import { format, addDays, getDay, isSameDay } from 'date-fns';
+import { Plus, Trash2, Calendar, Dumbbell, Users, Repeat, X, Clock, ChevronLeft, ChevronRight, Edit2, Save, Upload, Loader2, Search, UserPlus, Phone, Key, Settings, FileText, ClipboardList } from 'lucide-react';
+import { format, addDays, getDay, isSameDay, parseISO } from 'date-fns';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { UserRole } from '../../types.js';
 
@@ -18,7 +18,7 @@ const DAYS_OF_WEEK = [
 
 export const AdminPanel = () => {
   const { 
-      modalities, sessions, users, bookingReleaseHour,
+      modalities, sessions, users, bookings, bookingReleaseHour,
       addModality, updateModality, deleteModality, 
       addSession, updateSession, deleteSession, 
       registerStudent, updateUser, deleteUser, resetUserPassword, updateBookingReleaseHour,
@@ -66,6 +66,9 @@ export const AdminPanel = () => {
       password: ''
   });
   const [studentSearch, setStudentSearch] = useState('');
+
+  // --- State for Reports ---
+  const [reportDate, setReportDate] = useState(new Date());
 
   const closeConfirmation = () => setConfirmation({ ...confirmation, isOpen: false });
 
@@ -362,6 +365,11 @@ export const AdminPanel = () => {
        u.phone?.includes(studentSearch))
   );
 
+  // --- Report Helpers ---
+  const reportSessions = sessions.filter(s => {
+      return isSameDay(new Date(s.startTime), reportDate);
+  }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <ConfirmationModal 
@@ -399,6 +407,13 @@ export const AdminPanel = () => {
           >
             <Users className="w-4 h-4" />
             Alunos
+          </button>
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`${activeTab === 'reports' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
+          >
+            <FileText className="w-4 h-4" />
+            Relatórios
           </button>
         </nav>
       </div>
@@ -954,7 +969,7 @@ export const AdminPanel = () => {
                                   <label className="block text-sm font-medium text-gray-700">Senha Inicial</label>
                                   <div className="relative">
                                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                          <Key className="h-4 w-4 text-gray-400" />
+                                          <Key className="w-4 h-4 text-gray-400" />
                                       </div>
                                       <input
                                           type="text"
@@ -1072,6 +1087,120 @@ export const AdminPanel = () => {
                               )}
                           </tbody>
                       </table>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {activeTab === 'reports' && (
+          <div className="space-y-6">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-4 mb-6">
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Selecione o Dia</label>
+                          <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={() => setReportDate(addDays(reportDate, -1))}
+                                    className="p-2 hover:bg-gray-100 rounded-lg border border-gray-300"
+                                >
+                                    <ChevronLeft className="w-4 h-4 text-gray-600" />
+                                </button>
+                                <input 
+                                    type="date" 
+                                    value={format(reportDate, 'yyyy-MM-dd')}
+                                    onChange={(e) => setReportDate(parseISO(e.target.value))}
+                                    className="block border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium text-gray-900"
+                                />
+                                <button 
+                                    onClick={() => setReportDate(addDays(reportDate, 1))}
+                                    className="p-2 hover:bg-gray-100 rounded-lg border border-gray-300"
+                                >
+                                    <ChevronRight className="w-4 h-4 text-gray-600" />
+                                </button>
+                          </div>
+                      </div>
+                      <div className="text-right">
+                            <span className="text-xs text-gray-500 uppercase tracking-wide font-bold">Total de Aulas</span>
+                            <div className="text-2xl font-bold text-gray-900">{reportSessions.length}</div>
+                      </div>
+                  </div>
+
+                  <div className="space-y-6">
+                      {reportSessions.map(session => {
+                          const modality = modalities.find(m => m.id === session.modalityId);
+                          const sessionBookings = bookings.filter(b => b.sessionId === session.id && b.status === 'CONFIRMED');
+                          
+                          return (
+                              <div key={session.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                                      <div className="flex items-center gap-3">
+                                          <div className="bg-indigo-600 text-white px-3 py-1 rounded text-sm font-bold">
+                                              {format(new Date(session.startTime), 'HH:mm')}
+                                          </div>
+                                          <div>
+                                              <h3 className="font-bold text-gray-900">{modality?.name}</h3>
+                                              <p className="text-xs text-gray-500">Instrutor: {session.instructor}</p>
+                                          </div>
+                                      </div>
+                                      <div className="text-sm font-medium text-gray-600">
+                                          {sessionBookings.length} / {session.capacity} Alunos
+                                      </div>
+                                  </div>
+                                  
+                                  <div className="overflow-x-auto">
+                                      <table className="min-w-full divide-y divide-gray-200">
+                                          <thead className="bg-white">
+                                              <tr>
+                                                  <th className="px-6 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Aluno</th>
+                                                  <th className="px-6 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Plano</th>
+                                                  <th className="px-6 py-2 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Reserva Feita em</th>
+                                              </tr>
+                                          </thead>
+                                          <tbody className="bg-white divide-y divide-gray-100">
+                                              {sessionBookings.map(booking => {
+                                                  const user = users.find(u => u.id === booking.userId);
+                                                  return (
+                                                      <tr key={booking.id}>
+                                                          <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                              {user?.name || 'Usuário Removido'}
+                                                          </td>
+                                                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                                                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                                  ${user?.planType === 'Wellhub' ? 'bg-red-100 text-red-800' : 
+                                                                    user?.planType === 'Totalpass' ? 'bg-green-100 text-green-800' : 
+                                                                    user?.planType === 'Mensalista' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                                  {user?.planType || '-'}
+                                                              </span>
+                                                          </td>
+                                                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
+                                                              {format(new Date(booking.bookedAt), "dd/MM 'às' HH:mm")}
+                                                          </td>
+                                                      </tr>
+                                                  );
+                                              })}
+                                              {sessionBookings.length === 0 && (
+                                                  <tr>
+                                                      <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-400 italic">
+                                                          Nenhum aluno inscrito nesta aula.
+                                                      </td>
+                                                  </tr>
+                                              )}
+                                          </tbody>
+                                      </table>
+                                  </div>
+                              </div>
+                          );
+                      })}
+                      
+                      {reportSessions.length === 0 && (
+                          <div className="text-center py-12">
+                              <div className="mx-auto h-12 w-12 text-gray-300">
+                                  <ClipboardList className="h-full w-full" />
+                              </div>
+                              <h3 className="mt-2 text-sm font-medium text-gray-900">Sem atividades</h3>
+                              <p className="mt-1 text-sm text-gray-500">Não há aulas agendadas para o dia selecionado.</p>
+                          </div>
+                      )}
                   </div>
               </div>
           </div>
