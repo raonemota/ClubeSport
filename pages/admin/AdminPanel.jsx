@@ -45,7 +45,7 @@ export const AdminPanel = () => {
     setFormLoading(true);
     const result = await registerUser(teacherForm, UserRole.TEACHER);
     if (result.success) {
-      alert(`Professor registrado!\n\nAgora, vá no seu Supabase > Authentication e crie o usuário com o e-mail: ${teacherForm.email} e a senha: ${teacherForm.password}`);
+      alert(`Professor cadastrado com sucesso!\n\nLogin: ${teacherForm.email}\nSenha: ${teacherForm.password}`);
       setTeacherForm({ name: '', phone: '', email: '', password: 'mudar@123' });
       setShowTeacherForm(false);
     } else {
@@ -59,7 +59,7 @@ export const AdminPanel = () => {
     setFormLoading(true);
     const result = await registerUser(studentForm, UserRole.STUDENT);
     if (result.success) {
-      alert(`Aluno registrado!\n\nAgora, vá no seu Supabase > Authentication e crie o usuário com o e-mail: ${studentForm.email} e a senha: ${studentForm.password}`);
+      alert(`Aluno cadastrado com sucesso!\n\nLogin: ${studentForm.email}\nSenha: ${studentForm.password}`);
       setStudentForm({ name: '', phone: '', email: '', password: 'mudar@123', planType: 'Mensalista' });
       setShowStudentForm(false);
     } else {

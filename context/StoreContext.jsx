@@ -1,7 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { UserRole, BookingStatus } from '../types.js';
-import { supabase } from '../lib/supabaseClient.js';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabaseClient.js';
+import { createClient } from '@supabase/supabase-js';
 import { INITIAL_USERS, INITIAL_MODALITIES, INITIAL_SESSIONS, INITIAL_BOOKINGS } from '../services/mockData.js';
 import { isSameDay, parseISO, differenceInMinutes } from 'date-fns';
 
@@ -119,6 +120,7 @@ export const StoreProvider = ({ children }) => {
   const logout = async () => { if (supabase) await supabase.auth.signOut(); setCurrentUser(null); };
 
   const registerUser = async (userData, role = UserRole.STUDENT) => {
+    // 1. Modo Mock (Sem backend)
     if (!supabase) { 
       const newUser = { ...userData, id: Math.random().toString(36).substr(2, 9), role, mustChangePassword: true };
       setUsers([...users, newUser]); 
@@ -126,9 +128,36 @@ export const StoreProvider = ({ children }) => {
     }
     
     try {
-      // payload sem a coluna 'password' pois ela não existe no schema do 'profiles'
+      // 2. Criar Cliente Temporário para o Registro
+      // Isso evita que o signUp desconecte o admin atual (persistSession: false)
+      const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false
+        }
+      });
+
+      // 3. Criar Usuário no Supabase Auth
+      const { data: authData, error: authError } = await tempClient.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+      });
+
+      if (authError) {
+        console.error("Erro no Auth:", authError);
+        return { success: false, error: authError.message };
+      }
+
+      const newUserId = authData.user?.id;
+      
+      if (!newUserId) {
+        return { success: false, error: "Usuário criado, mas ID não retornado. Verifique confirmação de email." };
+      }
+
+      // 4. Criar Perfil Público vinculado ao ID do Auth
       const payload = {
-        id: crypto.randomUUID(),
+        id: newUserId, // Vincula o ID gerado pelo Auth
         email: userData.email,
         name: userData.name,
         phone: userData.phone,
@@ -136,21 +165,22 @@ export const StoreProvider = ({ children }) => {
         must_change_password: true
       };
 
-      const { error } = await supabase.from('profiles').insert([payload]);
+      const { error: profileError } = await supabase.from('profiles').insert([payload]);
 
-      if (error) {
-        // Se o erro for de duplicidade (e-mail já existe), tentamos atualizar em vez de inserir
-        if (error.code === '23505') {
-            const { error: updateError } = await supabase.from('profiles').update(payload).eq('email', userData.email);
-            if (updateError) return { success: false, error: updateError.message };
+      if (profileError) {
+        console.error("Erro no Profile:", profileError);
+        // Tenta fallback se o usuário já existir no profile (caso de re-cadastro)
+        if (profileError.code === '23505') {
+             const { error: updateError } = await supabase.from('profiles').update(payload).eq('email', userData.email);
+             if (updateError) return { success: false, error: updateError.message };
         } else {
-            console.error("Erro no registro:", error);
-            return { success: false, error: error.message };
+             return { success: false, error: profileError.message };
         }
       }
 
       await fetchData(); 
       return { success: true };
+
     } catch (err) {
       console.error("Exceção no registro:", err);
       return { success: false, error: "Falha inesperada no processamento." };
