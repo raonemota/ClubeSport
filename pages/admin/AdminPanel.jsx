@@ -47,8 +47,9 @@ export const AdminPanel = () => {
     if (result.success) {
       setTeacherForm({ name: '', phone: '', email: '', password: 'mudar@123' });
       setShowTeacherForm(false);
+      alert("Professor cadastrado com sucesso!");
     } else {
-      alert("Erro ao cadastrar: " + result.error);
+      alert("Erro ao cadastrar professor: " + result.error);
     }
     setFormLoading(false);
   };
@@ -60,8 +61,9 @@ export const AdminPanel = () => {
     if (result.success) {
       setStudentForm({ name: '', phone: '', email: '', password: 'mudar@123', planType: 'Mensalista' });
       setShowStudentForm(false);
+      alert("Aluno cadastrado com sucesso!");
     } else {
-      alert("Erro ao cadastrar: " + result.error);
+      alert("Erro ao cadastrar aluno: " + result.error);
     }
     setFormLoading(false);
   };
@@ -126,17 +128,17 @@ export const AdminPanel = () => {
                 <form onSubmit={handleModalitySubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                       <label className="text-xs font-bold text-slate-500">Nome da Modalidade</label>
-                       <input type="text" value={modalityForm.name} onChange={e => setModalityForm({...modalityForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Natação" required />
+                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome da Modalidade</label>
+                       <input type="text" value={modalityForm.name} onChange={e => setModalityForm({...modalityForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Natação" required />
                     </div>
                     <div className="space-y-1">
-                       <label className="text-xs font-bold text-slate-500">URL da Imagem</label>
-                       <input type="text" value={modalityForm.imageUrl} onChange={e => setModalityForm({...modalityForm, imageUrl: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" placeholder="https://..." />
+                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">URL da Imagem</label>
+                       <input type="text" value={modalityForm.imageUrl} onChange={e => setModalityForm({...modalityForm, imageUrl: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://..." />
                     </div>
                   </div>
                   <div className="space-y-1">
-                     <label className="text-xs font-bold text-slate-500">Descrição</label>
-                     <textarea value={modalityForm.description} onChange={e => setModalityForm({...modalityForm, description: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" rows="2" placeholder="Breve descrição..." />
+                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição</label>
+                     <textarea value={modalityForm.description} onChange={e => setModalityForm({...modalityForm, description: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" rows="2" placeholder="Breve descrição..." />
                   </div>
                   <div className="flex justify-end gap-2">
                     <button type="button" onClick={() => setShowModalityForm(false)} className="bg-slate-100 text-slate-500 px-4 py-2 rounded-lg">Cancelar</button>
@@ -184,33 +186,33 @@ export const AdminPanel = () => {
                  <form onSubmit={handleSessionSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500">Modalidade</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Modalidade</label>
                       <select value={sessionForm.modalityId} onChange={e => setSessionForm({...sessionForm, modalityId: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 bg-white" required>
                         <option value="">Selecione...</option>
                         {modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500">Data</label>
-                      <input type="date" value={sessionForm.date} onChange={e => setSessionForm({...sessionForm, date: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" required />
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Data</label>
+                      <input type="date" value={sessionForm.date} onChange={e => setSessionForm({...sessionForm, date: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500">Hora</label>
-                      <input type="time" value={sessionForm.time} onChange={e => setSessionForm({...sessionForm, time: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" required />
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hora</label>
+                      <input type="time" value={sessionForm.time} onChange={e => setSessionForm({...sessionForm, time: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                      <div className="space-y-1 md:col-span-2">
-                        <label className="text-xs font-bold text-slate-500">Instrutor</label>
-                        <input type="text" value={sessionForm.instructor} onChange={e => setSessionForm({...sessionForm, instructor: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Nome do Professor" required />
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Instrutor</label>
+                        <input type="text" value={sessionForm.instructor} onChange={e => setSessionForm({...sessionForm, instructor: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Nome do Professor" required />
                      </div>
                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500">Capacidade</label>
-                        <input type="number" value={sessionForm.capacity} onChange={e => setSessionForm({...sessionForm, capacity: parseInt(e.target.value)})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" min="1" required />
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Capacidade</label>
+                        <input type="number" value={sessionForm.capacity} onChange={e => setSessionForm({...sessionForm, capacity: parseInt(e.target.value)})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" min="1" required />
                      </div>
                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500">Categoria (Opcional)</label>
-                        <input type="text" value={sessionForm.category} onChange={e => setSessionForm({...sessionForm, category: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Iniciante" />
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
+                        <input type="text" value={sessionForm.category} onChange={e => setSessionForm({...sessionForm, category: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Iniciante" />
                      </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
@@ -257,9 +259,6 @@ export const AdminPanel = () => {
                         </tr>
                       );
                   })}
-                  {sessions.length === 0 && (
-                     <tr><td colSpan="5" className="text-center py-12 text-slate-400">Nenhuma aula cadastrada na grade.</td></tr>
-                  )}
                 </tbody>
               </table>
             </div>
@@ -280,19 +279,19 @@ export const AdminPanel = () => {
               <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
                 <form onSubmit={handleTeacherSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome Completo</label>
                     <input type="text" value={teacherForm.name} onChange={e => setTeacherForm({...teacherForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">E-mail</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">E-mail</label>
                     <input type="email" value={teacherForm.email} onChange={e => setTeacherForm({...teacherForm, email: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Telefone</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Telefone</label>
                     <input type="text" value={teacherForm.phone} onChange={e => setTeacherForm({...teacherForm, phone: formatPhone(e.target.value)})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="(00) 00000-0000" required />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Senha Inicial</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Senha Inicial</label>
                     <div className="relative">
                       <Key className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
                       <input type="text" value={teacherForm.password} onChange={e => setTeacherForm({...teacherForm, password: e.target.value})} className="w-full border rounded-lg pl-8 p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
@@ -336,9 +335,6 @@ export const AdminPanel = () => {
                       </td>
                     </tr>
                   ))}
-                  {teachers.length === 0 && (
-                    <tr><td colSpan="3" className="text-center py-8 text-slate-400">Nenhum professor cadastrado.</td></tr>
-                  )}
                 </tbody>
               </table>
             </div>
@@ -359,19 +355,19 @@ export const AdminPanel = () => {
               <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
                 <form onSubmit={handleStudentSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome Completo</label>
                     <input type="text" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">E-mail</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">E-mail</label>
                     <input type="email" value={studentForm.email} onChange={e => setStudentForm({...studentForm, email: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Telefone</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Telefone</label>
                     <input type="text" value={studentForm.phone} onChange={e => setStudentForm({...studentForm, phone: formatPhone(e.target.value)})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="(00) 00000-0000" required />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Senha Inicial</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Senha Inicial</label>
                     <div className="relative">
                       <Key className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
                       <input type="text" value={studentForm.password} onChange={e => setStudentForm({...studentForm, password: e.target.value})} className="w-full border rounded-lg pl-8 p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
@@ -405,7 +401,7 @@ export const AdminPanel = () => {
                     <tr key={s.id} className="hover:bg-slate-50">
                       <td className="px-6 py-4">
                         <div className="font-medium text-slate-900">{s.name}</div>
-                        <div className="text-xs text-slate-400">ID: {s.id.substring(0,6)}</div>
+                        <div className="text-xs text-slate-400 uppercase font-bold tracking-tighter">ID: {s.id.substring(0,8)}</div>
                       </td>
                       <td className="px-6 py-4 text-slate-500">
                         <div className="flex flex-col">
@@ -418,9 +414,6 @@ export const AdminPanel = () => {
                       </td>
                     </tr>
                   ))}
-                  {students.length === 0 && (
-                    <tr><td colSpan="3" className="text-center py-12 text-slate-400">Nenhum aluno encontrado.</td></tr>
-                  )}
                 </tbody>
               </table>
             </div>
@@ -443,7 +436,7 @@ export const AdminPanel = () => {
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
                     <Filter className="w-5 h-5 text-slate-400" />
                     <div className="flex items-center gap-2">
-                         <label className="text-sm font-bold text-slate-600">Filtrar por Data:</label>
+                         <label className="text-sm font-bold text-slate-600">Data:</label>
                          <input 
                             type="date" 
                             value={reportDate} 
@@ -474,42 +467,17 @@ export const AdminPanel = () => {
                               
                               return (
                                   <tr key={session.id} className="hover:bg-slate-50">
-                                      <td className="px-6 py-4">
-                                          <div className="font-bold text-slate-700 flex items-center gap-2">
-                                              <Clock className="w-4 h-4 text-slate-400" />
-                                              {format(parseISO(session.startTime), 'HH:mm')} 
-                                          </div>
-                                          <div className="text-xs text-slate-400 pl-6">
-                                              {session.durationMinutes} min
-                                          </div>
-                                      </td>
+                                      <td className="px-6 py-4 font-bold text-slate-700">{format(parseISO(session.startTime), 'HH:mm')}</td>
                                       <td className="px-6 py-4">
                                           <div className="font-medium text-slate-900">{modality?.name || 'Geral'}</div>
                                           <div className="text-xs text-slate-500">{session.instructor}</div>
                                       </td>
+                                      <td className="px-6 py-4 text-center font-bold text-indigo-600">{stats.total}</td>
+                                      <td className="px-6 py-4 text-center font-bold">{attendanceRate}%</td>
                                       <td className="px-6 py-4 text-center">
-                                          <span className="font-bold text-slate-700">{stats.total}</span>
-                                          <span className="text-slate-400 text-xs">/{session.capacity}</span>
-                                      </td>
-                                      <td className="px-6 py-4">
-                                          <div className="flex flex-col gap-1">
-                                              <div className="flex text-xs justify-between font-medium">
-                                                  <span className="text-green-600">{stats.attended} Presenças</span>
-                                                  <span className="text-red-500">{stats.missed} Faltas</span>
-                                              </div>
-                                              <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                                                  <div className="bg-green-500 h-full" style={{ width: `${attendanceRate}%` }}></div>
-                                              </div>
-                                          </div>
-                                      </td>
-                                      <td className="px-6 py-4 text-center">
-                                          {stats.confirmed > 0 && stats.attended === 0 && stats.missed === 0 ? (
-                                               <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-[10px] font-bold uppercase">Aguardando Chamada</span>
-                                          ) : stats.total === 0 ? (
-                                               <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-[10px] font-bold uppercase">Sem Alunos</span>
-                                          ) : (
-                                               <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-bold uppercase">Finalizada</span>
-                                          )}
+                                           <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${stats.total === 0 ? 'bg-slate-100 text-slate-500' : 'bg-green-100 text-green-700'}`}>
+                                                {stats.total === 0 ? 'Sem Alunos' : 'Finalizada'}
+                                           </span>
                                       </td>
                                   </tr>
                               );
@@ -524,7 +492,7 @@ export const AdminPanel = () => {
                   <thead className="bg-slate-50 font-bold text-slate-500">
                     <tr>
                       <th className="px-6 py-4 text-left uppercase tracking-tighter text-[10px]">Aluno</th>
-                      <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Total Agendamentos</th>
+                      <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Agendamentos</th>
                       <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Presenças</th>
                       <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Faltas</th>
                       <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Aproveitamento</th>

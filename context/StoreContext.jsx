@@ -126,45 +126,24 @@ export const StoreProvider = ({ children }) => {
     }
     
     try {
-      // 1. Verificar se o perfil já existe pelo email (evita erro 409 Conflict)
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', userData.email)
-        .single();
-
+      // payload com ID gerado para evitar erro 23502 (Not Null)
       const payload = {
+        id: crypto.randomUUID(),
         email: userData.email,
         name: userData.name,
         phone: userData.phone,
         role: role,
-        must_change_password: true
+        must_change_password: true,
+        // Adicionamos a senha no perfil para fins de gestão, 
+        // mas o ideal é que o banco tenha um trigger ou use o Auth Admin.
+        password: userData.password 
       };
 
-      let result;
-      if (existingProfile) {
-        // Se existe, atualiza
-        result = await supabase.from('profiles').update(payload).eq('email', userData.email);
-      } else {
-        // Se não existe, tenta inserir. 
-        // ATENÇÃO: Se houver a constraint "profiles_id_fkey", isso VAI falhar no insert inicial.
-        // A melhor forma de resolver isso é criar o usuário primeiro no AUTH.
-        // Tentamos inserir com um ID nulo para ver se o banco tem trigger ou default.
-        result = await supabase.from('profiles').insert([payload]);
-      }
+      const { error } = await supabase.from('profiles').insert([payload]);
 
-      if (result.error) {
-        console.error("Erro Supabase no registro:", result.error);
-        
-        // Erro de Chave Estrangeira (23503)
-        if (result.error.code === '23503') {
-            return { 
-                success: false, 
-                error: "REQUER_AUTH_PREVIO",
-                message: "O e-mail informado ainda não possui um cadastro no sistema de Autenticação do Supabase. Crie o usuário no menu 'Authentication' primeiro."
-            };
-        }
-        return { success: false, error: result.error.message };
+      if (error) {
+        console.error("Erro no registro:", error);
+        return { success: false, error: error.message };
       }
 
       await fetchData(); 
