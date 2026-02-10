@@ -5,7 +5,7 @@ import { UserRole } from '../types.js';
 import { Trophy, Lock, Mail, Info } from 'lucide-react';
 
 export const Login = () => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,13 +20,37 @@ export const Login = () => {
     }
   }, [currentUser, navigate]);
 
+  const handleIdentifierChange = (e) => {
+    let value = e.target.value;
+    
+    // Se o usuário estiver digitando apenas números, assumimos que é um telefone e aplicamos a máscara
+    const isPhone = /^[0-9()-\s]*$/.test(value);
+    
+    if (isPhone && value.length > 0) {
+        value = value.replace(/\D/g, "");
+        if (value.length > 11) value = value.slice(0, 11);
+
+        if (value.length > 10) {
+            value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, "($1) $2-$3");
+        } else if (value.length > 6) {
+            value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, "($1) $2-$3");
+        } else if (value.length > 2) {
+            value = value.replace(/^(\d{2})(\d{0,5}).*/, "($1) $2");
+        } else if (value.length > 0) {
+            value = value.replace(/^(\d*)/, "($1");
+        }
+    }
+
+    setIdentifier(value);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     
     try {
-      const success = await login(email, password);
+      const success = await login(identifier, password);
       if (!success) {
         setError('Falha no login. Verifique suas credenciais.');
       }
@@ -56,17 +80,17 @@ export const Login = () => {
           )}
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email ou Telefone</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Mail className="h-5 w-5 text-gray-400" />
               </div>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={identifier}
+                onChange={handleIdentifierChange}
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="seu@email.com"
+                placeholder="email@exemplo.com ou (71) 98878-3622"
                 required
               />
             </div>
@@ -102,7 +126,7 @@ export const Login = () => {
                 <Info className="w-5 h-5 text-indigo-600 flex-shrink-0" />
                 <div className="text-xs text-indigo-800">
                     <p className="font-bold mb-1">Primeiro Acesso?</p>
-                    <p>Utilize o email cadastrado na secretaria e a senha padrão fornecida (ex: <strong>mudar@123</strong>). Você poderá alterar sua senha após o login.</p>
+                    <p>Utilize o email ou telefone cadastrado na secretaria e a senha padrão fornecida (ex: <strong>mudar@123</strong>). Você poderá alterar sua senha após o login.</p>
                 </div>
             </div>
           </div>

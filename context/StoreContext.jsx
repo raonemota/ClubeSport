@@ -146,9 +146,10 @@ export const StoreProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, pass) => {
+  const login = async (identifier, pass) => {
+    // Modo Mock
     if (!supabase) {
-      const user = INITIAL_USERS.find(u => u.email === email);
+      const user = users.find(u => u.email === identifier || u.phone === identifier);
       if (user) {
         setCurrentUser(user);
         return true;
@@ -156,8 +157,32 @@ export const StoreProvider = ({ children }) => {
       return false;
     }
 
+    // Modo Supabase
+    let emailToUse = identifier;
+
+    // Se não for um email (ou seja, provavelmente um telefone), tentar encontrar o email associado
+    if (!identifier.includes('@')) {
+        try {
+            // Tenta encontrar o email pelo telefone exato (formatado ou não, depende de como foi salvo)
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('email')
+                .eq('phone', identifier)
+                .single();
+            
+            if (data && data.email) {
+                emailToUse = data.email;
+            } else {
+                return false; // Telefone não encontrado
+            }
+        } catch (err) {
+            console.error("Erro ao buscar usuário por telefone:", err);
+            return false;
+        }
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: emailToUse,
       password: pass,
     });
     

@@ -78,6 +78,34 @@ export const AdminPanel = () => {
 
   const closeConfirmation = () => setConfirmation({ ...confirmation, isOpen: false });
 
+  // --- Helper: Phone Mask ---
+  const handlePhoneChange = (e) => {
+    let value = e.target.value;
+    
+    // Remove tudo que não é dígito
+    value = value.replace(/\D/g, "");
+    
+    // Limita a 11 dígitos
+    if (value.length > 11) value = value.slice(0, 11);
+
+    // Aplica a máscara
+    if (value.length > 10) {
+      // (11) 91234-5678
+      value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, "($1) $2-$3");
+    } else if (value.length > 6) {
+      // (11) 9123-4...
+      value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, "($1) $2-$3");
+    } else if (value.length > 2) {
+      // (11) 9...
+      value = value.replace(/^(\d{2})(\d{0,5}).*/, "($1) $2");
+    } else if (value.length > 0) {
+      // (11...
+      value = value.replace(/^(\d*)/, "($1");
+    }
+    
+    setStudentForm({ ...studentForm, phone: value });
+  };
+
   // --- Modality Actions ---
   
   const startEditingModality = (modality) => {
@@ -1000,9 +1028,10 @@ export const AdminPanel = () => {
                               <input
                                   type="text"
                                   required
-                                  placeholder="(00) 00000-0000"
+                                  placeholder="(71) 98878-3622"
                                   value={studentForm.phone}
-                                  onChange={(e) => setStudentForm({ ...studentForm, phone: e.target.value })}
+                                  onChange={handlePhoneChange}
+                                  maxLength={15}
                                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
                               />
                           </div>

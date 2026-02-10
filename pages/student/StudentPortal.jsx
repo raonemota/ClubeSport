@@ -3,6 +3,7 @@ import { useStore } from '../../context/StoreContext';
 import { CheckCircle, XCircle, Clock, Calendar as CalendarIcon, ChevronRight, Lock, Tag, AlertCircle } from 'lucide-react';
 import { format, isPast, isToday, isTomorrow, addDays, differenceInCalendarDays } from 'date-fns';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
+import { FeedbackModal } from '../../components/FeedbackModal';
 
 const getStatusColor = (current, max) => {
   const percentage = current / max;
@@ -11,8 +12,9 @@ const getStatusColor = (current, max) => {
   return 'bg-green-100 text-green-800';
 };
 
-const DailyClassGroup = ({ date, modalityId, sessions }) => {
-    const { modalities, getSessionBookingsCount, bookSession, bookings, currentUser, bookingReleaseHour } = useStore();
+// Modificado para aceitar onBookSession em vez de chamar bookSession diretamente
+const DailyClassGroup = ({ date, modalityId, sessions, onBookSession }) => {
+    const { modalities, getSessionBookingsCount, bookings, currentUser, bookingReleaseHour } = useStore();
     const modality = modalities.find(m => m.id === modalityId);
     
     const dateObj = new Date(sessions[0].startTime); 
@@ -34,15 +36,6 @@ const DailyClassGroup = ({ date, modalityId, sessions }) => {
             lockReason = `Libera às ${bookingReleaseHour.toString().padStart(2, '0')}:00`;
         }
     }
-
-    const handleBook = async (sessionId) => {
-        const success = await bookSession(sessionId);
-        if (success) {
-            alert('Reserva confirmada!');
-        } else {
-            alert('Não foi possível realizar a reserva (Turma cheia ou já agendada).');
-        }
-    };
 
     const sortedSessions = [...sessions].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
@@ -119,7 +112,7 @@ const DailyClassGroup = ({ date, modalityId, sessions }) => {
                                     </div>
 
                                     <button 
-                                        onClick={() => handleBook(session.id)}
+                                        onClick={() => onBookSession(session)}
                                         disabled={isFull || isBookedByUser || isLocked}
                                         className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-1.5
                                             ${isBookedByUser 
@@ -208,12 +201,14 @@ const MyBookingCard = ({ session, bookingId, bookedAt, onRequestCancel }) => {
 };
 
 export const StudentPortal = () => {
-  const { modalities, sessions, bookings, currentUser, cancelBooking } = useStore();
+  const { modalities, sessions, bookings, currentUser, cancelBooking, bookSession } = useStore();
   const [activeTab, setActiveTab] = useState('browse');
   const [filterModality, setFilterModality] = useState('all');
 
-  // Modal State
+  // Modal States
   const [cancelModal, setCancelModal] = useState({ isOpen: false, bookingId: null });
+  const [confirmBookingModal, setConfirmBookingModal] = useState({ isOpen: false, session: null });
+  const [feedbackModal, setFeedbackModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
   const myBookings = bookings.filter(b => b.userId === currentUser?.id);
   
@@ -255,6 +250,41 @@ export const StudentPortal = () => {
 
   const groupedSessionList = Object.values(groupedSessions).sort((a, b) => a.date.localeCompare(b.date));
   
+  // -- Action Handlers --
+
+  // 1. Iniciar Fluxo de Reserva
+  const handleInitiateBooking = (session) => {
+    setConfirmBookingModal({ isOpen: true, session });
+  };
+
+  // 2. Confirmar e Executar Reserva
+  const executeBooking = async () => {
+    const session = confirmBookingModal.session;
+    if (!session) return;
+
+    // Fechar modal de confirmação imediatamente
+    setConfirmBookingModal({ isOpen: false, session: null });
+
+    const success = await bookSession(session.id);
+    
+    if (success) {
+        setFeedbackModal({
+            isOpen: true,
+            type: 'success',
+            title: 'Reserva Confirmada!',
+            message: `Sua aula de ${modalities.find(m => m.id === session.modalityId)?.name || 'Esporte'} está agendada.`
+        });
+    } else {
+        setFeedbackModal({
+            isOpen: true,
+            type: 'error',
+            title: 'Erro na Reserva',
+            message: 'Não foi possível completar a reserva. A turma pode estar cheia ou você já possui um agendamento conflitante.'
+        });
+    }
+  };
+
+  // 3. Cancelamento
   const handleRequestCancel = (bookingId) => {
       setCancelModal({ isOpen: true, bookingId });
   };
@@ -266,14 +296,41 @@ export const StudentPortal = () => {
       setCancelModal({ isOpen: false, bookingId: null });
   };
 
+  // Helper para mensagem do modal de confirmação
+  const getConfirmationMessage = () => {
+    if (!confirmBookingModal.session) return '';
+    const session = confirmBookingModal.session;
+    const modalityName = modalities.find(m => m.id === session.modalityId)?.name;
+    const dateStr = format(new Date(session.startTime), "dd/MM 'às' HH:mm");
+    
+    return `Você deseja confirmar sua presença na aula de ${modalityName} com ${session.instructor} no dia ${dateStr}?`;
+  };
+
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Modais */}
       <ConfirmationModal
         isOpen={cancelModal.isOpen}
         onClose={() => setCancelModal({ ...cancelModal, isOpen: false })}
         onConfirm={confirmCancel}
         title="Cancelar Agendamento"
         message="Tem certeza que deseja cancelar sua presença nesta aula? Essa ação liberará a vaga para outros alunos."
+      />
+
+      <ConfirmationModal
+        isOpen={confirmBookingModal.isOpen}
+        onClose={() => setConfirmBookingModal({ isOpen: false, session: null })}
+        onConfirm={executeBooking}
+        title="Confirmar Reserva"
+        message={getConfirmationMessage()}
+      />
+
+      <FeedbackModal 
+        isOpen={feedbackModal.isOpen}
+        onClose={() => setFeedbackModal({ ...feedbackModal, isOpen: false })}
+        type={feedbackModal.type}
+        title={feedbackModal.title}
+        message={feedbackModal.message}
       />
 
       {/* Header */}
@@ -326,6 +383,7 @@ export const StudentPortal = () => {
                         date={group.date}
                         modalityId={group.modalityId}
                         sessions={group.sessions}
+                        onBookSession={handleInitiateBooking}
                     />
                 ))}
                 
