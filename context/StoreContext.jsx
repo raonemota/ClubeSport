@@ -126,24 +126,27 @@ export const StoreProvider = ({ children }) => {
     }
     
     try {
-      // payload com ID gerado para evitar erro 23502 (Not Null)
+      // payload sem a coluna 'password' pois ela não existe no schema do 'profiles'
       const payload = {
         id: crypto.randomUUID(),
         email: userData.email,
         name: userData.name,
         phone: userData.phone,
         role: role,
-        must_change_password: true,
-        // Adicionamos a senha no perfil para fins de gestão, 
-        // mas o ideal é que o banco tenha um trigger ou use o Auth Admin.
-        password: userData.password 
+        must_change_password: true
       };
 
       const { error } = await supabase.from('profiles').insert([payload]);
 
       if (error) {
-        console.error("Erro no registro:", error);
-        return { success: false, error: error.message };
+        // Se o erro for de duplicidade (e-mail já existe), tentamos atualizar em vez de inserir
+        if (error.code === '23505') {
+            const { error: updateError } = await supabase.from('profiles').update(payload).eq('email', userData.email);
+            if (updateError) return { success: false, error: updateError.message };
+        } else {
+            console.error("Erro no registro:", error);
+            return { success: false, error: error.message };
+        }
       }
 
       await fetchData(); 
