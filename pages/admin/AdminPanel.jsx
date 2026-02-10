@@ -1,17 +1,21 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { Plus, Trash2, Calendar, Dumbbell, Users, X, Edit2, FileText, ClipboardList, GraduationCap, Phone, Mail, CheckCircle2, XCircle, Clock, AlertCircle, Filter, Save, Info } from 'lucide-react';
+import { Plus, Trash2, Calendar, Dumbbell, Users, X, FileText, GraduationCap, Phone, Mail, Clock, Filter, Save, Info, AlertCircle, ShieldCheck, Key } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { UserRole, BookingStatus } from '../../types.js';
 
 export const AdminPanel = () => {
-  const { modalities, sessions, users, bookings, registerUser, updateUser, deleteUser, getStudentStats, addModality, deleteModality, addSession, deleteSession } = useStore();
+  const { modalities, sessions, users, bookings, registerUser, deleteUser, getStudentStats, addModality, deleteModality, addSession, deleteSession } = useStore();
   const [activeTab, setActiveTab] = useState('reports');
   
   // States para Formulários
   const [showTeacherForm, setShowTeacherForm] = useState(false);
-  const [teacherForm, setTeacherForm] = useState({ name: '', phone: '', email: '' });
+  const [showStudentForm, setShowStudentForm] = useState(false);
+  
+  const [teacherForm, setTeacherForm] = useState({ name: '', phone: '', email: '', password: 'mudar@123' });
+  const [studentForm, setStudentForm] = useState({ name: '', phone: '', email: '', password: 'mudar@123', planType: 'Mensalista' });
+  
   const [formLoading, setFormLoading] = useState(false);
   
   const [showModalityForm, setShowModalityForm] = useState(false);
@@ -26,41 +30,38 @@ export const AdminPanel = () => {
   const teachers = users.filter(u => u.role === UserRole.TEACHER);
   const students = users.filter(u => u.role === UserRole.STUDENT);
 
-  // Máscara de Telefone: (00) 00000-0000
-  const handlePhoneChange = (e) => {
-    let value = e.target.value.replace(/\D/g, "");
+  const formatPhone = (value) => {
+    value = value.replace(/\D/g, "");
     if (value.length > 11) value = value.slice(0, 11);
-
-    if (value.length === 11) {
-      value = value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
-    } else if (value.length > 6) {
-      value = value.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
-    } else if (value.length > 2) {
-      value = value.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
-    } else if (value.length > 0) {
-      value = value.replace(/^(\d*)/, "($1");
-    }
-    setTeacherForm({ ...teacherForm, phone: value });
+    if (value.length === 11) return value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+    if (value.length > 6) return value.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
+    if (value.length > 2) return value.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
+    if (value.length > 0) return value.replace(/^(\d*)/, "($1");
+    return value;
   };
 
   const handleTeacherSubmit = async (e) => {
     e.preventDefault();
     setFormLoading(true);
-    
     const result = await registerUser(teacherForm, UserRole.TEACHER);
-    
     if (result.success) {
-      alert("Sucesso! O perfil do professor foi criado/atualizado.");
-      setTeacherForm({ name: '', phone: '', email: '' });
+      setTeacherForm({ name: '', phone: '', email: '', password: 'mudar@123' });
       setShowTeacherForm(false);
     } else {
-      if (result.error === "REQUER_AUTH_PREVIO") {
-          alert(`Atenção Administrador:\n\n${result.message}\n\nO Supabase exige que o usuário exista na tabela de Autenticação antes de criarmos o perfil.`);
-      } else if (result.error && result.error.includes('profiles_role_check')) {
-        alert("Erro de Permissão: O banco de dados ainda não aceita o papel 'TEACHER'. Você precisa atualizar a CONSTRAINT 'profiles_role_check' no SQL do Supabase para incluir 'TEACHER'.");
-      } else {
-        alert("Erro ao cadastrar: " + (result.error || "Ocorreu um erro inesperado."));
-      }
+      alert("Erro ao cadastrar: " + result.error);
+    }
+    setFormLoading(false);
+  };
+
+  const handleStudentSubmit = async (e) => {
+    e.preventDefault();
+    setFormLoading(true);
+    const result = await registerUser(studentForm, UserRole.STUDENT);
+    if (result.success) {
+      setStudentForm({ name: '', phone: '', email: '', password: 'mudar@123', planType: 'Mensalista' });
+      setShowStudentForm(false);
+    } else {
+      alert("Erro ao cadastrar: " + result.error);
     }
     setFormLoading(false);
   };
@@ -115,7 +116,7 @@ export const AdminPanel = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h1 className="text-2xl font-bold text-slate-800">Modalidades Esportivas</h1>
-              <button onClick={() => setShowModalityForm(!showModalityForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-sm">
+              <button onClick={() => setShowModalityForm(!showModalityForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-sm transition-all">
                 <Plus className="w-4 h-4" /> Nova Modalidade
               </button>
             </div>
@@ -277,18 +278,25 @@ export const AdminPanel = () => {
 
             {showTeacherForm && (
               <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
-                <form onSubmit={handleTeacherSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <form onSubmit={handleTeacherSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500">Nome Completo</label>
-                    <input type="text" value={teacherForm.name} onChange={e => setTeacherForm({...teacherForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Prof. Carlos" required />
+                    <label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label>
+                    <input type="text" value={teacherForm.name} onChange={e => setTeacherForm({...teacherForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500">Telefone</label>
-                    <input type="text" value={teacherForm.phone} onChange={handlePhoneChange} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="(00) 00000-0000" required />
+                    <label className="text-xs font-bold text-slate-500 uppercase">E-mail</label>
+                    <input type="email" value={teacherForm.email} onChange={e => setTeacherForm({...teacherForm, email: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500">E-mail</label>
-                    <input type="email" value={teacherForm.email} onChange={e => setTeacherForm({...teacherForm, email: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="professor@clube.com" required />
+                    <label className="text-xs font-bold text-slate-500 uppercase">Telefone</label>
+                    <input type="text" value={teacherForm.phone} onChange={e => setTeacherForm({...teacherForm, phone: formatPhone(e.target.value)})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="(00) 00000-0000" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Senha Inicial</label>
+                    <div className="relative">
+                      <Key className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
+                      <input type="text" value={teacherForm.password} onChange={e => setTeacherForm({...teacherForm, password: e.target.value})} className="w-full border rounded-lg pl-8 p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+                    </div>
                   </div>
                   <div className="flex items-end gap-2">
                     <button 
@@ -296,25 +304,11 @@ export const AdminPanel = () => {
                         disabled={formLoading}
                         className="bg-indigo-600 text-white h-10 px-6 rounded-lg font-bold text-sm hover:bg-indigo-700 w-full transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        {formLoading ? 'Salvando...' : <><Save className="w-4 h-4" /> Salvar</>}
+                        {formLoading ? '...' : <Save className="w-4 h-4" />} Salvar
                     </button>
-                    <button type="button" onClick={() => setShowTeacherForm(false)} className="bg-slate-100 text-slate-500 h-10 px-4 rounded-lg"><X /></button>
+                    <button type="button" onClick={() => setShowTeacherForm(false)} className="bg-slate-100 text-slate-500 h-10 px-4 rounded-lg"><X className="w-4 h-4" /></button>
                   </div>
                 </form>
-                <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex gap-4 items-start shadow-sm">
-                    <div className="bg-indigo-600 p-2 rounded-lg text-white">
-                        <ShieldAlert className="w-5 h-5" />
-                    </div>
-                    <div className="text-xs text-indigo-900 leading-relaxed">
-                        <p className="font-bold text-sm mb-1">Procedimento do Supabase:</p>
-                        <ol className="list-decimal list-inside space-y-1">
-                            <li>Vá ao seu <strong>Supabase Dashboard > Authentication > Users</strong>.</li>
-                            <li>Clique em <strong>Add User > Create new user</strong>.</li>
-                            <li>Insira o e-mail: <strong>{teacherForm.email || '...'}</strong> e defina uma senha temporária.</li>
-                            <li><strong>SÓ ENTÃO</strong> clique no botão <strong>Salvar</strong> acima para registrar o Perfil dele.</li>
-                        </ol>
-                    </div>
-                </div>
               </div>
             )}
 
@@ -356,17 +350,52 @@ export const AdminPanel = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h1 className="text-2xl font-bold text-slate-800">Gestão de Alunos</h1>
-              <div className="text-sm text-slate-500">
-                Total de Alunos: <span className="font-bold text-slate-900">{students.length}</span>
-              </div>
+              <button onClick={() => setShowStudentForm(!showStudentForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-sm transition-all">
+                <Plus className="w-4 h-4" /> Novo Aluno
+              </button>
             </div>
+
+            {showStudentForm && (
+              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
+                <form onSubmit={handleStudentSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label>
+                    <input type="text" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">E-mail</label>
+                    <input type="email" value={studentForm.email} onChange={e => setStudentForm({...studentForm, email: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Telefone</label>
+                    <input type="text" value={studentForm.phone} onChange={e => setStudentForm({...studentForm, phone: formatPhone(e.target.value)})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="(00) 00000-0000" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Senha Inicial</label>
+                    <div className="relative">
+                      <Key className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
+                      <input type="text" value={studentForm.password} onChange={e => setStudentForm({...studentForm, password: e.target.value})} className="w-full border rounded-lg pl-8 p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
+                    </div>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <button 
+                        type="submit" 
+                        disabled={formLoading}
+                        className="bg-indigo-600 text-white h-10 px-6 rounded-lg font-bold text-sm hover:bg-indigo-700 w-full transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                        {formLoading ? '...' : <Save className="w-4 h-4" />} Salvar
+                    </button>
+                    <button type="button" onClick={() => setShowStudentForm(false)} className="bg-slate-100 text-slate-500 h-10 px-4 rounded-lg"><X className="w-4 h-4" /></button>
+                  </div>
+                </form>
+              </div>
+            )}
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 font-bold text-slate-500">
                   <tr>
                     <th className="px-6 py-4 text-left">Aluno</th>
-                    <th className="px-6 py-4 text-left">Plano / Observação</th>
                     <th className="px-6 py-4 text-left">Contato</th>
                     <th className="px-6 py-4 text-right">Ações</th>
                   </tr>
@@ -378,16 +407,6 @@ export const AdminPanel = () => {
                         <div className="font-medium text-slate-900">{s.name}</div>
                         <div className="text-xs text-slate-400">ID: {s.id.substring(0,6)}</div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-block px-2 py-1 rounded bg-indigo-50 text-indigo-700 text-xs font-bold mb-1">
-                          {s.planType || 'Padrão'}
-                        </span>
-                        {s.observation && (
-                          <p className="text-xs text-slate-500 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> {s.observation}
-                          </p>
-                        )}
-                      </td>
                       <td className="px-6 py-4 text-slate-500">
                         <div className="flex flex-col">
                           <span className="flex items-center gap-1 text-xs"><Mail className="w-3 h-3" /> {s.email}</span>
@@ -395,18 +414,12 @@ export const AdminPanel = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button 
-                            onClick={() => deleteUser(s.id)} 
-                            className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Desativar Aluno"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
+                        <button onClick={() => deleteUser(s.id)} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                       </td>
                     </tr>
                   ))}
                   {students.length === 0 && (
-                    <tr><td colSpan="4" className="text-center py-12 text-slate-400">Nenhum aluno encontrado.</td></tr>
+                    <tr><td colSpan="3" className="text-center py-12 text-slate-400">Nenhum aluno encontrado.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -501,9 +514,6 @@ export const AdminPanel = () => {
                                   </tr>
                               );
                       })}
-                      {sessions.filter(session => isSameDay(parseISO(session.startTime), parseISO(reportDate))).length === 0 && (
-                          <tr><td colSpan="5" className="text-center py-12 text-slate-400 italic">Nenhuma aula encontrada para esta data.</td></tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
@@ -515,8 +525,8 @@ export const AdminPanel = () => {
                     <tr>
                       <th className="px-6 py-4 text-left uppercase tracking-tighter text-[10px]">Aluno</th>
                       <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Total Agendamentos</th>
-                      <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Presenças (Check)</th>
-                      <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Faltas (F)</th>
+                      <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Presenças</th>
+                      <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Faltas</th>
                       <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Aproveitamento</th>
                     </tr>
                   </thead>
@@ -528,20 +538,9 @@ export const AdminPanel = () => {
                         <tr key={s.id} className="hover:bg-slate-50">
                           <td className="px-6 py-4 font-medium text-slate-900">{s.name}</td>
                           <td className="px-6 py-4 text-center text-slate-600 font-bold">{stats.total}</td>
-                          <td className="px-6 py-4 text-center">
-                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">{stats.attended}</span>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">{stats.missed}</span>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-16 bg-slate-200 h-2 rounded-full overflow-hidden">
-                                <div className={`h-full ${percent > 70 ? 'bg-green-500' : 'bg-orange-400'}`} style={{width: `${percent}%`}}></div>
-                              </div>
-                              <span className="font-bold text-xs">{percent}%</span>
-                            </div>
-                          </td>
+                          <td className="px-6 py-4 text-center text-green-600 font-bold">{stats.attended}</td>
+                          <td className="px-6 py-4 text-center text-red-600 font-bold">{stats.missed}</td>
+                          <td className="px-6 py-4 text-center font-bold">{percent}%</td>
                         </tr>
                       );
                     })}
@@ -555,6 +554,3 @@ export const AdminPanel = () => {
     </div>
   );
 };
-
-// Import necessário para o ícone de alerta
-import { ShieldAlert } from 'lucide-react';
