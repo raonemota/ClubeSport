@@ -143,19 +143,31 @@ export const StoreProvider = ({ children }) => {
       return { success: true }; 
     }
     
-    // NOTA: No Supabase, você não pode criar usuários auth.users via código frontend comum por segurança.
-    // O admin deve criar o usuário no painel do Supabase e o perfil será gerado via Trigger SQL (ou manualmente).
-    // Aqui fazemos o upsert apenas na tabela profiles para consistência de dados.
-    const { error } = await supabase.from('profiles').upsert([{
-      email: userData.email,
-      name: userData.name,
-      phone: userData.phone,
-      role: role,
-      must_change_password: true
-    }]);
+    try {
+      // Como não temos um ID do Auth ainda (pois o admin cria lá), 
+      // geramos um UUID aleatório para o perfil não ficar órfão.
+      // Futuramente, ao criar no Auth, o admin deve atualizar este perfil com o ID real
+      // ou o Trigger SQL deve cuidar da sincronização por email.
+      const { error } = await supabase.from('profiles').insert([{
+        id: crypto.randomUUID(),
+        email: userData.email,
+        name: userData.name,
+        phone: userData.phone,
+        role: role,
+        must_change_password: true
+      }]);
 
-    if (!error) fetchData(); 
-    return { success: !error };
+      if (error) {
+        console.error("Erro no Supabase registerUser:", error);
+        return { success: false, error: error.message };
+      }
+
+      fetchData(); 
+      return { success: true };
+    } catch (err) {
+      console.error("Erro inesperado no registerUser:", err);
+      return { success: false, error: "Erro interno no processamento." };
+    }
   };
 
   const updateBookingStatus = async (bookingId, status) => {

@@ -26,13 +26,31 @@ export const AdminPanel = () => {
   const teachers = users.filter(u => u.role === UserRole.TEACHER);
   const students = users.filter(u => u.role === UserRole.STUDENT);
 
+  const handlePhoneChange = (e) => {
+    let value = e.target.value.replace(/\D/g, "");
+    if (value.length > 11) value = value.slice(0, 11);
+
+    if (value.length > 10) {
+        value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, "($1) $2-$3");
+    } else if (value.length > 6) {
+        value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, "($1) $2-$3");
+    } else if (value.length > 2) {
+        value = value.replace(/^(\d{2})(\d{0,5}).*/, "($1) $2");
+    } else if (value.length > 0) {
+        value = value.replace(/^(\d*)/, "($1");
+    }
+    setTeacherForm({ ...teacherForm, phone: value });
+  };
+
   const handleTeacherSubmit = async (e) => {
     e.preventDefault();
     setFormLoading(true);
-    const success = await registerUser(teacherForm, UserRole.TEACHER);
-    if (success) {
+    const result = await registerUser(teacherForm, UserRole.TEACHER);
+    if (result.success) {
         setTeacherForm({ name: '', phone: '', email: '' });
         setShowTeacherForm(false);
+    } else {
+        alert("Erro ao cadastrar professor: " + (result.error || "Verifique o console"));
     }
     setFormLoading(false);
   };
@@ -256,7 +274,7 @@ export const AdminPanel = () => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500">Telefone</label>
-                    <input type="text" value={teacherForm.phone} onChange={e => setTeacherForm({...teacherForm, phone: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="(00) 00000-0000" required />
+                    <input type="text" value={teacherForm.phone} onChange={handlePhoneChange} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="(00) 00000-0000" required />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500">E-mail</label>
