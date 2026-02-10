@@ -94,7 +94,7 @@ export const StoreProvider = ({ children }) => {
     const { data: mods } = await supabase.from('modalities').select('*');
     if (mods) setModalities(mods.map(m => ({ id: m.id, name: m.name, description: m.description, imageUrl: m.image_url })));
     const { data: sess } = await supabase.from('class_sessions').select('*');
-    if (sess) setSessions(sess.map(s => ({ id: s.id, modalityId: s.modality_id, instructor: s.instructor, startTime: s.start_time, durationMinutes: s.duration_minutes, capacity: s.capacity, category: s.category })));
+    if (sess) setSessions(sess.map(s => ({ id: s.id, modalityId: s.modality_id, instructor: s.instructor, startTime: s.start_time, duration_minutes: s.duration_minutes, capacity: s.capacity, category: s.category })));
     const { data: bks } = await supabase.from('bookings').select('*');
     if (bks) setBookings(bks.map(b => ({ id: b.id, sessionId: b.session_id, userId: b.user_id, status: b.status, bookedAt: b.booked_at })));
     const { data: usrs } = await supabase.from('profiles').select('*');
@@ -118,6 +118,63 @@ export const StoreProvider = ({ children }) => {
 
   const logout = async () => { if (supabase) await supabase.auth.signOut(); setCurrentUser(null); };
 
+  const registerUser = async (userData, role = UserRole.STUDENT) => {
+    if (!supabase) { 
+      const newUser = { ...userData, id: Math.random().toString(36).substr(2, 9), role, mustChangePassword: true };
+      setUsers([...users, newUser]); 
+      return { success: true }; 
+    }
+    
+    try {
+      // 1. Verificar se o perfil já existe pelo email (evita erro 409 Conflict)
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', userData.email)
+        .single();
+
+      const payload = {
+        email: userData.email,
+        name: userData.name,
+        phone: userData.phone,
+        role: role,
+        must_change_password: true
+      };
+
+      let result;
+      if (existingProfile) {
+        // Se existe, atualiza
+        result = await supabase.from('profiles').update(payload).eq('email', userData.email);
+      } else {
+        // Se não existe, tenta inserir. 
+        // ATENÇÃO: Se houver a constraint "profiles_id_fkey", isso VAI falhar no insert inicial.
+        // A melhor forma de resolver isso é criar o usuário primeiro no AUTH.
+        // Tentamos inserir com um ID nulo para ver se o banco tem trigger ou default.
+        result = await supabase.from('profiles').insert([payload]);
+      }
+
+      if (result.error) {
+        console.error("Erro Supabase no registro:", result.error);
+        
+        // Erro de Chave Estrangeira (23503)
+        if (result.error.code === '23503') {
+            return { 
+                success: false, 
+                error: "REQUER_AUTH_PREVIO",
+                message: "O e-mail informado ainda não possui um cadastro no sistema de Autenticação do Supabase. Crie o usuário no menu 'Authentication' primeiro."
+            };
+        }
+        return { success: false, error: result.error.message };
+      }
+
+      await fetchData(); 
+      return { success: true };
+    } catch (err) {
+      console.error("Exceção no registro:", err);
+      return { success: false, error: "Falha inesperada no processamento." };
+    }
+  };
+
   const addSession = async (data) => {
     if (!supabase) { setSessions([...sessions, { ...data, id: Math.random().toString(36).substr(2, 9) }]); return; }
     await supabase.from('class_sessions').insert([{ modality_id: data.modalityId, instructor: data.instructor, start_time: data.startTime, duration_minutes: data.durationMinutes, capacity: data.capacity, category: data.category }]);
@@ -134,40 +191,6 @@ export const StoreProvider = ({ children }) => {
     if (!supabase) { setModalities(modalities.filter(m => m.id !== modalityId)); return; }
     await supabase.from('modalities').delete().eq('id', modalityId);
     fetchData();
-  };
-
-  const registerUser = async (userData, role = UserRole.STUDENT) => {
-    if (!supabase) { 
-      const newUser = { ...userData, id: Math.random().toString(36).substr(2, 9), role, mustChangePassword: true };
-      setUsers([...users, newUser]); 
-      return { success: true }; 
-    }
-    
-    try {
-      // Importante: role deve ser passado exatamente como o banco espera (Case Sensitive)
-      // Se profiles_role_check falha, significa que 'TEACHER' não está na lista permitida do banco.
-      const payload = {
-        id: crypto.randomUUID(),
-        email: userData.email,
-        name: userData.name,
-        phone: userData.phone,
-        role: role,
-        must_change_password: true
-      };
-
-      const { error } = await supabase.from('profiles').insert([payload]);
-
-      if (error) {
-        console.error("Erro crítico no registerUser:", error);
-        return { success: false, error: error.message };
-      }
-
-      await fetchData(); 
-      return { success: true };
-    } catch (err) {
-      console.error("Exceção no registerUser:", err);
-      return { success: false, error: "Ocorreu uma falha no processamento do registro." };
-    }
   };
 
   const updateBookingStatus = async (bookingId, status) => {

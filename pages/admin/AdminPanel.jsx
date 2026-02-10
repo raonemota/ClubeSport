@@ -31,7 +31,7 @@ export const AdminPanel = () => {
     let value = e.target.value.replace(/\D/g, "");
     if (value.length > 11) value = value.slice(0, 11);
 
-    if (value.length > 10) {
+    if (value.length === 11) {
       value = value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
     } else if (value.length > 6) {
       value = value.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
@@ -50,11 +50,13 @@ export const AdminPanel = () => {
     const result = await registerUser(teacherForm, UserRole.TEACHER);
     
     if (result.success) {
+      alert("Sucesso! O perfil do professor foi criado/atualizado.");
       setTeacherForm({ name: '', phone: '', email: '' });
       setShowTeacherForm(false);
     } else {
-      // Alerta amigável sobre a constraint de papel (role)
-      if (result.error && result.error.includes('profiles_role_check')) {
+      if (result.error === "REQUER_AUTH_PREVIO") {
+          alert(`Atenção Administrador:\n\n${result.message}\n\nO Supabase exige que o usuário exista na tabela de Autenticação antes de criarmos o perfil.`);
+      } else if (result.error && result.error.includes('profiles_role_check')) {
         alert("Erro de Permissão: O banco de dados ainda não aceita o papel 'TEACHER'. Você precisa atualizar a CONSTRAINT 'profiles_role_check' no SQL do Supabase para incluir 'TEACHER'.");
       } else {
         alert("Erro ao cadastrar: " + (result.error || "Ocorreu um erro inesperado."));
@@ -299,13 +301,18 @@ export const AdminPanel = () => {
                     <button type="button" onClick={() => setShowTeacherForm(false)} className="bg-slate-100 text-slate-500 h-10 px-4 rounded-lg"><X /></button>
                   </div>
                 </form>
-                <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-lg flex gap-3 items-start">
-                    <Info className="w-4 h-4 text-amber-600 mt-0.5" />
-                    <div className="text-[11px] text-amber-800 leading-relaxed">
-                        <p className="font-bold mb-1">Passo Importante:</p>
-                        <p>1. Salve o perfil aqui para aparecer na lista e nas aulas.</p>
-                        <p>2. No console do Supabase Auth, crie o usuário com o e-mail: <strong>{teacherForm.email || '...'}</strong>.</p>
-                        <p>3. Certifique-se de que a constraint de papel aceita 'TEACHER'.</p>
+                <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex gap-4 items-start shadow-sm">
+                    <div className="bg-indigo-600 p-2 rounded-lg text-white">
+                        <ShieldAlert className="w-5 h-5" />
+                    </div>
+                    <div className="text-xs text-indigo-900 leading-relaxed">
+                        <p className="font-bold text-sm mb-1">Procedimento do Supabase:</p>
+                        <ol className="list-decimal list-inside space-y-1">
+                            <li>Vá ao seu <strong>Supabase Dashboard > Authentication > Users</strong>.</li>
+                            <li>Clique em <strong>Add User > Create new user</strong>.</li>
+                            <li>Insira o e-mail: <strong>{teacherForm.email || '...'}</strong> e defina uma senha temporária.</li>
+                            <li><strong>SÓ ENTÃO</strong> clique no botão <strong>Salvar</strong> acima para registrar o Perfil dele.</li>
+                        </ol>
                     </div>
                 </div>
               </div>
@@ -548,3 +555,6 @@ export const AdminPanel = () => {
     </div>
   );
 };
+
+// Import necessário para o ícone de alerta
+import { ShieldAlert } from 'lucide-react';
