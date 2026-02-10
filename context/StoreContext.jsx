@@ -411,6 +411,11 @@ export const StoreProvider = ({ children }) => {
   };
 
   const updateUser = async (id, updates) => {
+    // Atualização local do currentUser se for o próprio usuário
+    if (currentUser && currentUser.id === id) {
+        setCurrentUser(prev => ({ ...prev, ...updates }));
+    }
+
     if (!supabase) {
       setUsers(users.map(u => u.id === id ? { ...u, ...updates } : u));
       return;
@@ -424,6 +429,7 @@ export const StoreProvider = ({ children }) => {
 
     const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', id);
     if (!error) fetchData();
+    return !error;
   };
 
   const deleteUser = async (id) => {

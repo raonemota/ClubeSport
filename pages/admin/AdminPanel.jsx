@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { Plus, Trash2, Calendar, Dumbbell, Users, Repeat, X, Clock, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Edit2, Save, Upload, Loader2, Search, UserPlus, Phone, Key, Settings, FileText, ClipboardList, Filter, LayoutDashboard, Menu } from 'lucide-react';
 import { format, addDays, getDay, isSameDay, parseISO } from 'date-fns';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
+import { FeedbackModal } from '../../components/FeedbackModal';
 import { UserRole } from '../../types.js';
 
 const DAYS_OF_WEEK = [
@@ -22,15 +23,16 @@ export const AdminPanel = () => {
       addModality, updateModality, deleteModality, 
       addSession, updateSession, deleteSession, 
       registerStudent, updateUser, deleteUser, resetUserPassword, updateBookingReleaseHour,
-      getSessionBookingsCount 
+      getSessionBookingsCount, cancelBooking 
     } = useStore();
   
   // Alterado: Relatórios é a página padrão
   const [activeTab, setActiveTab] = useState('reports');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Confirmation Modal State
+  // Modal States
   const [confirmation, setConfirmation] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [feedback, setFeedback] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
   // --- State for Modalities ---
   const [showModalityForm, setShowModalityForm] = useState(false);
@@ -77,6 +79,11 @@ export const AdminPanel = () => {
   const [expandedReports, setExpandedReports] = useState(new Set());
 
   const closeConfirmation = () => setConfirmation({ ...confirmation, isOpen: false });
+
+  // Helper para mostrar feedback
+  const showFeedback = (type, title, message) => {
+    setFeedback({ isOpen: true, type, title, message });
+  };
 
   // --- Helper: Phone Mask ---
   const handlePhoneChange = (e) => {
@@ -150,7 +157,7 @@ export const AdminPanel = () => {
 
                 if (uploadError) {
                     console.error('Erro no upload:', uploadError);
-                    alert('Erro ao fazer upload da imagem. A operação continuará com a imagem antiga ou padrão.');
+                    showFeedback('error', 'Erro no Upload', 'Erro ao fazer upload da imagem. A operação continuará com a imagem antiga ou padrão.');
                 } else {
                     const { data } = supabase.storage
                         .from('modality-images')
@@ -158,7 +165,7 @@ export const AdminPanel = () => {
                     finalImageUrl = data.publicUrl;
                 }
             } else {
-                alert('Modo de demonstração: Upload de arquivo simulado.');
+                showFeedback('success', 'Modo Demo', 'Upload de arquivo simulado no modo demonstração.');
                 finalImageUrl = `https://picsum.photos/400/200?random=${Date.now()}`;
             }
         }
@@ -169,20 +176,21 @@ export const AdminPanel = () => {
                 description: formModDesc,
                 imageUrl: finalImageUrl 
             });
-            alert('Modalidade atualizada com sucesso!');
+            showFeedback('success', 'Sucesso', 'Modalidade atualizada com sucesso!');
         } else {
             await addModality({
                 name: formModName,
                 description: formModDesc,
                 imageUrl: finalImageUrl || `https://picsum.photos/400/200?random=${Date.now()}`
             });
+            showFeedback('success', 'Sucesso', 'Nova modalidade criada com sucesso!');
         }
 
         cancelEditingModality();
 
     } catch (error) {
         console.error(error);
-        alert('Ocorreu um erro ao salvar a modalidade.');
+        showFeedback('error', 'Erro', 'Ocorreu um erro ao salvar a modalidade.');
     } finally {
         setUploading(false);
     }
@@ -221,7 +229,7 @@ export const AdminPanel = () => {
   const handleAddSessions = (e) => {
     e.preventDefault();
     if (!newSessionModalityId || !newSessionStartDate || selectedTimes.length === 0 || selectedDays.length === 0) {
-        alert("Preencha todos os campos obrigatórios, selecione dias e adicione horários.");
+        showFeedback('error', 'Campos Incompletos', "Preencha todos os campos obrigatórios, selecione dias e adicione horários.");
         return;
     }
 
@@ -234,10 +242,14 @@ export const AdminPanel = () => {
             isOpen: true,
             title: 'Confirmar Geração em Lote',
             message: `Você está prestes a criar ${totalSessions} aulas. Deseja continuar?`,
-            onConfirm: () => generateSessions(startDate, durationWeeks)
+            onConfirm: () => {
+                generateSessions(startDate, durationWeeks);
+                showFeedback('success', 'Geração Concluída', `${totalSessions} aulas foram geradas com sucesso.`);
+            }
         });
     } else {
         generateSessions(startDate, durationWeeks);
+        showFeedback('success', 'Geração Concluída', `${totalSessions} aulas foram geradas com sucesso.`);
     }
   };
 
@@ -338,9 +350,9 @@ export const AdminPanel = () => {
           onConfirm: async () => {
               const success = await resetUserPassword(student.email);
               if (success) {
-                  alert(`Email de redefinição enviado para ${student.email}`);
+                  showFeedback('success', 'Email Enviado', `Email de redefinição enviado para ${student.email}`);
               } else {
-                  alert('Erro ao enviar email. Verifique se o sistema está configurado corretamente.');
+                  showFeedback('error', 'Erro', 'Erro ao enviar email. Verifique se o sistema está configurado corretamente.');
               }
           }
       });
@@ -363,7 +375,7 @@ export const AdminPanel = () => {
                   planType: studentForm.planType,
                   observation: studentForm.observation
               });
-              alert('Dados do aluno atualizados com sucesso!');
+              showFeedback('success', 'Atualizado', 'Dados do aluno atualizados com sucesso!');
               cancelEditingStudent();
           } else {
               const result = await registerStudent({
@@ -376,11 +388,11 @@ export const AdminPanel = () => {
               });
 
               if (result.success) {
-                  alert(result.message || 'Aluno cadastrado com sucesso!');
+                  showFeedback('success', 'Cadastrado', result.message || 'Aluno cadastrado com sucesso!');
                   setStudentForm({ name: '', phone: '', planType: 'Mensalista', observation: '', email: '', password: '' });
                   setShowStudentForm(false);
               } else {
-                  alert(result.message || 'Erro ao cadastrar aluno.');
+                  showFeedback('error', 'Erro no Cadastro', result.message || 'Erro ao cadastrar aluno.');
               }
           }
       } finally {
@@ -419,6 +431,18 @@ export const AdminPanel = () => {
       setExpandedReports(newSet);
   };
 
+  const handleCancelBooking = (bookingId, studentName) => {
+      setConfirmation({
+          isOpen: true,
+          title: 'Remover Agendamento',
+          message: `Tem certeza que deseja remover o agendamento de ${studentName}? A vaga será liberada imediatamente.`,
+          onConfirm: async () => {
+              await cancelBooking(bookingId);
+              showFeedback('success', 'Agendamento Removido', 'O aluno foi removido da aula com sucesso.');
+          }
+      });
+  };
+
   const NavButton = ({ tabId, icon: Icon, label }) => (
     <button
       onClick={() => {
@@ -444,6 +468,14 @@ export const AdminPanel = () => {
         onConfirm={confirmation.onConfirm}
         title={confirmation.title}
         message={confirmation.message}
+      />
+
+      <FeedbackModal
+        isOpen={feedback.isOpen}
+        onClose={() => setFeedback({ ...feedback, isOpen: false })}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
       />
 
       {/* Mobile Toggle */}
@@ -1290,6 +1322,7 @@ export const AdminPanel = () => {
                                                     <th className="px-6 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Aluno</th>
                                                     <th className="px-6 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Plano</th>
                                                     <th className="px-6 py-2 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Reserva Feita em</th>
+                                                    <th className="px-6 py-2 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Ações</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="bg-white divide-y divide-gray-100">
@@ -1311,12 +1344,21 @@ export const AdminPanel = () => {
                                                             <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
                                                                 {format(new Date(booking.bookedAt), "dd/MM 'às' HH:mm")}
                                                             </td>
+                                                            <td className="px-6 py-3 whitespace-nowrap text-right text-sm font-medium">
+                                                                <button
+                                                                    onClick={() => handleCancelBooking(booking.id, user?.name)}
+                                                                    className="text-red-600 hover:text-red-900 hover:bg-red-50 p-2 rounded-full transition-colors"
+                                                                    title="Remover agendamento"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </td>
                                                         </tr>
                                                     );
                                                 })}
                                                 {sessionBookings.length === 0 && (
                                                     <tr>
-                                                        <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-400 italic">
+                                                        <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-400 italic">
                                                             Nenhum aluno inscrito nesta aula.
                                                         </td>
                                                     </tr>
