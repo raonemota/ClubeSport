@@ -1,1 +1,2 @@
-// DEPRECATED: This file is no longer used. Please use index.html entry point.
+// ARQUIVO OBSOLETO. POR FAVOR, EXCLUA ESTE ARQUIVO.
+// O ponto de entrada correto é main.jsx
