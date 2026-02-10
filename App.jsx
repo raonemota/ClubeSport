@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { StoreProvider, useStore } from './context/StoreContext';
@@ -6,30 +7,20 @@ import { Login } from './pages/Login';
 import { AdminPanel } from './pages/admin/AdminPanel';
 import { StudentPortal } from './pages/student/StudentPortal';
 import { StudentProfile } from './pages/student/StudentProfile';
+import { TeacherPortal } from './pages/teacher/TeacherPortal';
 import { ForcePasswordChange } from './pages/ForcePasswordChange';
 import { UserRole } from './types.js';
 
-// Protected Route Wrapper
 const ProtectedRoute = ({ children, role }) => {
   const { currentUser } = useStore();
   const location = useLocation();
 
-  if (!currentUser) {
-    return <Navigate to="/" replace />;
-  }
+  if (!currentUser) return <Navigate to="/" replace />;
+  if (currentUser.mustChangePassword && location.pathname !== '/change-password') return <Navigate to="/change-password" replace />;
 
-  // 1. Check Forced Password Change Logic
-  if (currentUser.mustChangePassword && location.pathname !== '/change-password') {
-    return <Navigate to="/change-password" replace />;
-  }
-
-  if (!currentUser.mustChangePassword && location.pathname === '/change-password') {
-     return <Navigate to={currentUser.role === UserRole.ADMIN ? '/admin' : '/student'} replace />;
-  }
-
-  // 2. Role Check (only if not in forced password mode)
   if (role && currentUser.role !== role) {
-    return <Navigate to={currentUser.role === UserRole.ADMIN ? '/admin' : '/student'} replace />;
+    const dest = currentUser.role === UserRole.ADMIN ? '/admin' : currentUser.role === UserRole.TEACHER ? '/teacher' : '/student';
+    return <Navigate to={dest} replace />;
   }
 
   return <>{children}</>;
@@ -38,82 +29,38 @@ const ProtectedRoute = ({ children, role }) => {
 const ConditionalNavbar = () => {
     const location = useLocation();
     const { currentUser } = useStore();
-    
-    if (location.pathname === '/') return null;
-    if (location.pathname === '/change-password') return null;
-    if (currentUser?.mustChangePassword) return null;
-
+    if (location.pathname === '/' || location.pathname === '/change-password' || currentUser?.mustChangePassword) return null;
     return <Navbar />;
 };
 
 const AppContent = () => {
   return (
     <Router>
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col bg-slate-50">
         <ConditionalNavbar />
-        
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<Login />} />
-            
-            <Route 
-                path="/change-password" 
-                element={
-                    <ProtectedRoute>
-                        <ForcePasswordChange />
-                    </ProtectedRoute>
-                } 
-            />
-
-            <Route 
-              path="/admin" 
-              element={
-                <ProtectedRoute role={UserRole.ADMIN}>
-                  <AdminPanel />
-                </ProtectedRoute>
-              } 
-            />
-
-            <Route 
-              path="/student" 
-              element={
-                <ProtectedRoute role={UserRole.STUDENT}>
-                  <StudentPortal />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/student/my-bookings" 
-              element={
-                <ProtectedRoute role={UserRole.STUDENT}>
-                  <StudentPortal /> 
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/student/profile" 
-              element={
-                <ProtectedRoute role={UserRole.STUDENT}>
-                  <StudentProfile />
-                </ProtectedRoute>
-              } 
-            />
+            <Route path="/change-password" element={<ProtectedRoute><ForcePasswordChange /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute role={UserRole.ADMIN}><AdminPanel /></ProtectedRoute>} />
+            <Route path="/teacher" element={<ProtectedRoute role={UserRole.TEACHER}><TeacherPortal /></ProtectedRoute>} />
+            <Route path="/student" element={<ProtectedRoute role={UserRole.STUDENT}><StudentPortal /></ProtectedRoute>} />
+            <Route path="/student/profile" element={<ProtectedRoute role={UserRole.STUDENT}><StudentProfile /></ProtectedRoute>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
-        <footer className="bg-slate-900 text-slate-400 py-6 text-center text-sm">
-          &copy; {new Date().getFullYear()} ClubeSport. Todos os direitos reservados.
+        <footer className="bg-slate-900 text-slate-500 py-6 text-center text-xs">
+          &copy; {new Date().getFullYear()} ClubeSport. Gestão Esportiva Inteligente.
         </footer>
       </div>
     </Router>
   );
 };
 
-const App = () => {
-  return (
-      <StoreProvider>
-        <AppContent />
-      </StoreProvider>
-  );
-};
+const App = () => (
+  <StoreProvider>
+    <AppContent />
+  </StoreProvider>
+);
 
 export default App;

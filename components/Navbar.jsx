@@ -1,63 +1,64 @@
+
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { UserRole } from '../types.js';
-import { LogOut, User as UserIcon, Trophy } from 'lucide-react';
+import { LogOut, User as UserIcon, Trophy, ClipboardCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export const Navbar = () => {
   const { currentUser, logout } = useStore();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
   if (!currentUser) return null;
 
+  const roleLabels = {
+    [UserRole.ADMIN]: 'Administrador',
+    [UserRole.TEACHER]: 'Professor',
+    [UserRole.STUDENT]: 'Aluno'
+  };
+
+  const dashboardPath = {
+    [UserRole.ADMIN]: '/admin',
+    [UserRole.TEACHER]: '/teacher',
+    [UserRole.STUDENT]: '/student'
+  };
+
   return (
-    <nav className="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+    <nav className="bg-slate-900 text-white shadow-lg sticky top-0 z-50 border-b border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <Link to={currentUser.role === UserRole.ADMIN ? '/admin' : '/student'} className="flex-shrink-0 font-bold text-xl tracking-wider flex items-center gap-2 text-indigo-400">
+            <Link to={dashboardPath[currentUser.role]} className="flex-shrink-0 font-bold text-xl tracking-wider flex items-center gap-2 text-indigo-400">
               <Trophy className="w-6 h-6" />
               ClubeSport
             </Link>
-            <div className="hidden md:block">
-              <div className="ml-10 flex items-baseline space-x-4">
-                {currentUser.role === UserRole.ADMIN ? (
+            <div className="hidden md:block ml-10">
+              <div className="flex items-baseline space-x-4">
+                {currentUser.role === UserRole.ADMIN && (
+                   <Link to="/admin" className="hover:bg-slate-800 px-3 py-2 rounded-md text-sm font-medium">Painel Admin</Link>
+                )}
+                {currentUser.role === UserRole.TEACHER && (
+                   <Link to="/teacher" className="hover:bg-slate-800 px-3 py-2 rounded-md text-sm font-medium flex items-center gap-2">
+                     <ClipboardCheck className="w-4 h-4" /> Chamadas
+                   </Link>
+                )}
+                {currentUser.role === UserRole.STUDENT && (
                   <>
-                    <Link to="/admin" className="hover:bg-slate-700 px-3 py-2 rounded-md text-sm font-medium">Painel</Link>
-                  </>
-                ) : (
-                  <>
-                    <Link to="/student" className="hover:bg-slate-700 px-3 py-2 rounded-md text-sm font-medium">Aulas Disponíveis</Link>
-                    <Link to="/student/my-bookings" className="hover:bg-slate-700 px-3 py-2 rounded-md text-sm font-medium">Meus Agendamentos</Link>
+                    <Link to="/student" className="hover:bg-slate-800 px-3 py-2 rounded-md text-sm font-medium">Aulas</Link>
+                    <Link to="/student/profile" className="hover:bg-slate-800 px-3 py-2 rounded-md text-sm font-medium">Perfil</Link>
                   </>
                 )}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Link 
-              to={currentUser.role === UserRole.ADMIN ? '/admin' : '/student/profile'} 
-              className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors"
-              title="Ir para o Perfil"
-            >
-              <div className="bg-slate-800 p-1.5 rounded-full">
-                <UserIcon className="w-4 h-4" />
-              </div>
-              <div className="hidden sm:flex flex-col items-start leading-none">
-                <span className="font-medium">{currentUser.name}</span>
-                <span className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">
-                    {currentUser.role === UserRole.ADMIN ? 'Administrador' : 'Aluno'}
-                </span>
-              </div>
-            </Link>
+            <div className="flex flex-col items-end leading-none mr-2">
+              <span className="font-medium text-sm">{currentUser.name}</span>
+              <span className="text-[10px] text-indigo-400 uppercase font-bold tracking-tighter">{roleLabels[currentUser.role]}</span>
+            </div>
             <button
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 p-2 rounded-full text-white transition-colors"
+              onClick={() => { logout(); navigate('/'); }}
+              className="bg-slate-800 hover:bg-red-600 p-2 rounded-full text-white transition-all shadow-inner"
               title="Sair"
             >
               <LogOut className="w-4 h-4" />
