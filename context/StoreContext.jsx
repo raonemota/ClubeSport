@@ -144,29 +144,29 @@ export const StoreProvider = ({ children }) => {
     }
     
     try {
-      // Como não temos um ID do Auth ainda (pois o admin cria lá), 
-      // geramos um UUID aleatório para o perfil não ficar órfão.
-      // Futuramente, ao criar no Auth, o admin deve atualizar este perfil com o ID real
-      // ou o Trigger SQL deve cuidar da sincronização por email.
-      const { error } = await supabase.from('profiles').insert([{
+      // Importante: role deve ser passado exatamente como o banco espera (Case Sensitive)
+      // Se profiles_role_check falha, significa que 'TEACHER' não está na lista permitida do banco.
+      const payload = {
         id: crypto.randomUUID(),
         email: userData.email,
         name: userData.name,
         phone: userData.phone,
         role: role,
         must_change_password: true
-      }]);
+      };
+
+      const { error } = await supabase.from('profiles').insert([payload]);
 
       if (error) {
-        console.error("Erro no Supabase registerUser:", error);
+        console.error("Erro crítico no registerUser:", error);
         return { success: false, error: error.message };
       }
 
-      fetchData(); 
+      await fetchData(); 
       return { success: true };
     } catch (err) {
-      console.error("Erro inesperado no registerUser:", err);
-      return { success: false, error: "Erro interno no processamento." };
+      console.error("Exceção no registerUser:", err);
+      return { success: false, error: "Ocorreu uma falha no processamento do registro." };
     }
   };
 

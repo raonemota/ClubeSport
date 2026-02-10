@@ -26,18 +26,19 @@ export const AdminPanel = () => {
   const teachers = users.filter(u => u.role === UserRole.TEACHER);
   const students = users.filter(u => u.role === UserRole.STUDENT);
 
+  // Máscara de Telefone: (00) 00000-0000
   const handlePhoneChange = (e) => {
     let value = e.target.value.replace(/\D/g, "");
     if (value.length > 11) value = value.slice(0, 11);
 
     if (value.length > 10) {
-        value = value.replace(/^(\d{2})(\d{5})(\d{4}).*/, "($1) $2-$3");
+      value = value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
     } else if (value.length > 6) {
-        value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, "($1) $2-$3");
+      value = value.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
     } else if (value.length > 2) {
-        value = value.replace(/^(\d{2})(\d{0,5}).*/, "($1) $2");
+      value = value.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
     } else if (value.length > 0) {
-        value = value.replace(/^(\d*)/, "($1");
+      value = value.replace(/^(\d*)/, "($1");
     }
     setTeacherForm({ ...teacherForm, phone: value });
   };
@@ -45,12 +46,19 @@ export const AdminPanel = () => {
   const handleTeacherSubmit = async (e) => {
     e.preventDefault();
     setFormLoading(true);
+    
     const result = await registerUser(teacherForm, UserRole.TEACHER);
+    
     if (result.success) {
-        setTeacherForm({ name: '', phone: '', email: '' });
-        setShowTeacherForm(false);
+      setTeacherForm({ name: '', phone: '', email: '' });
+      setShowTeacherForm(false);
     } else {
-        alert("Erro ao cadastrar professor: " + (result.error || "Verifique o console"));
+      // Alerta amigável sobre a constraint de papel (role)
+      if (result.error && result.error.includes('profiles_role_check')) {
+        alert("Erro de Permissão: O banco de dados ainda não aceita o papel 'TEACHER'. Você precisa atualizar a CONSTRAINT 'profiles_role_check' no SQL do Supabase para incluir 'TEACHER'.");
+      } else {
+        alert("Erro ao cadastrar: " + (result.error || "Ocorreu um erro inesperado."));
+      }
     }
     setFormLoading(false);
   };
@@ -291,9 +299,15 @@ export const AdminPanel = () => {
                     <button type="button" onClick={() => setShowTeacherForm(false)} className="bg-slate-100 text-slate-500 h-10 px-4 rounded-lg"><X /></button>
                   </div>
                 </form>
-                <p className="mt-4 text-[10px] text-slate-400 italic flex items-center gap-1">
-                    <Info className="w-3 h-3" /> Após salvar, o professor deve ser criado manualmente no Supabase Auth com este mesmo e-mail.
-                </p>
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-lg flex gap-3 items-start">
+                    <Info className="w-4 h-4 text-amber-600 mt-0.5" />
+                    <div className="text-[11px] text-amber-800 leading-relaxed">
+                        <p className="font-bold mb-1">Passo Importante:</p>
+                        <p>1. Salve o perfil aqui para aparecer na lista e nas aulas.</p>
+                        <p>2. No console do Supabase Auth, crie o usuário com o e-mail: <strong>{teacherForm.email || '...'}</strong>.</p>
+                        <p>3. Certifique-se de que a constraint de papel aceita 'TEACHER'.</p>
+                    </div>
+                </div>
               </div>
             )}
 
