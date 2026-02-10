@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Lock, Save, Trophy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { UserRole } from '../types.js';
 
 export const ForcePasswordChange = () => {
     const { currentUser, updatePassword } = useStore();
@@ -30,7 +32,9 @@ export const ForcePasswordChange = () => {
         try {
             const success = await updatePassword(newPassword);
             if (success) {
-                navigate('/student');
+                // Redirecionamento baseado no papel do usuário
+                const dest = currentUser.role === UserRole.ADMIN ? '/admin' : currentUser.role === UserRole.TEACHER ? '/teacher' : '/student';
+                navigate(dest);
             } else {
                 setError('Erro ao atualizar a senha. Tente novamente.');
             }

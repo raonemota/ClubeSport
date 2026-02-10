@@ -254,11 +254,17 @@ export const StoreProvider = ({ children }) => {
         fetchData();
       },
       updatePassword: async (newPassword) => {
-          if (!supabase) return true;
+          if (!supabase) {
+              // Modo Mock: Atualiza estado local e "banco" mock
+              setCurrentUser(prev => ({ ...prev, mustChangePassword: false }));
+              setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, mustChangePassword: false } : u));
+              return true;
+          }
+          // Modo Supabase
           const { error } = await supabase.auth.updateUser({ password: newPassword });
           if (!error) {
               await supabase.from('profiles').update({ must_change_password: false }).eq('id', currentUser.id);
-              setCurrentUser({ ...currentUser, mustChangePassword: false });
+              setCurrentUser(prev => ({ ...prev, mustChangePassword: false }));
           }
           return !error;
       }
