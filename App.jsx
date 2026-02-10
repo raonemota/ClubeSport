@@ -110,11 +110,9 @@ const AppContent = () => {
 
 const App = () => {
   return (
-    <ErrorBoundary>
       <StoreProvider>
         <AppContent />
       </StoreProvider>
-    </ErrorBoundary>
   );
 };
 
