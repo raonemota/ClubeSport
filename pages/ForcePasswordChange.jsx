@@ -32,15 +32,20 @@ export const ForcePasswordChange = () => {
         try {
             const success = await updatePassword(newPassword);
             if (success) {
-                // Redirecionamento baseado no papel do usuário
-                const dest = currentUser.role === UserRole.ADMIN ? '/admin' : currentUser.role === UserRole.TEACHER ? '/teacher' : '/student';
-                navigate(dest);
+                // Pequeno delay para garantir que o React Context propagou a atualização
+                // do status 'mustChangePassword: false' para toda a aplicação
+                // antes de tentar navegar para uma rota protegida.
+                setTimeout(() => {
+                    const dest = currentUser.role === UserRole.ADMIN ? '/admin' : currentUser.role === UserRole.TEACHER ? '/teacher' : '/student';
+                    navigate(dest, { replace: true });
+                }, 500);
             } else {
                 setError('Erro ao atualizar a senha. Tente novamente.');
+                setLoading(false);
             }
         } catch (err) {
+            console.error(err);
             setError('Ocorreu um erro inesperado.');
-        } finally {
             setLoading(false);
         }
     };

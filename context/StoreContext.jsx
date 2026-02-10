@@ -256,8 +256,9 @@ export const StoreProvider = ({ children }) => {
       updatePassword: async (newPassword) => {
           if (!supabase) {
               // Modo Mock: Atualiza estado local e "banco" mock
-              setCurrentUser(prev => ({ ...prev, mustChangePassword: false }));
-              setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, mustChangePassword: false } : u));
+              const updatedUser = { ...currentUser, mustChangePassword: false };
+              setCurrentUser(updatedUser);
+              setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
               return true;
           }
           // Modo Supabase
