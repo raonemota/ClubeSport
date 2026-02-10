@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { Plus, Trash2, Calendar, Dumbbell, Users, X, Edit2, FileText, ClipboardList, GraduationCap, Phone, Mail, CheckCircle2, XCircle, Clock, AlertCircle, Filter } from 'lucide-react';
+import { Plus, Trash2, Calendar, Dumbbell, Users, X, Edit2, FileText, ClipboardList, GraduationCap, Phone, Mail, CheckCircle2, XCircle, Clock, AlertCircle, Filter, Save } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { UserRole, BookingStatus } from '../../types.js';
 
@@ -11,7 +11,8 @@ export const AdminPanel = () => {
   
   // States para Formulários
   const [showTeacherForm, setShowTeacherForm] = useState(false);
-  const [teacherForm, setTeacherForm] = useState({ name: '', phone: '', email: '', mainModality: '' });
+  const [teacherForm, setTeacherForm] = useState({ name: '', phone: '', email: '' });
+  const [formLoading, setFormLoading] = useState(false);
   
   const [showModalityForm, setShowModalityForm] = useState(false);
   const [modalityForm, setModalityForm] = useState({ name: '', description: '', imageUrl: '' });
@@ -27,9 +28,13 @@ export const AdminPanel = () => {
 
   const handleTeacherSubmit = async (e) => {
     e.preventDefault();
-    await registerUser(teacherForm, UserRole.TEACHER);
-    setTeacherForm({ name: '', phone: '', email: '', mainModality: '' });
-    setShowTeacherForm(false);
+    setFormLoading(true);
+    const success = await registerUser(teacherForm, UserRole.TEACHER);
+    if (success) {
+        setTeacherForm({ name: '', phone: '', email: '' });
+        setShowTeacherForm(false);
+    }
+    setFormLoading(false);
   };
 
   const handleModalitySubmit = async (e) => {
@@ -258,10 +263,19 @@ export const AdminPanel = () => {
                     <input type="email" value={teacherForm.email} onChange={e => setTeacherForm({...teacherForm, email: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="professor@clube.com" required />
                   </div>
                   <div className="flex items-end gap-2">
-                    <button type="submit" className="bg-indigo-600 text-white h-10 px-6 rounded-lg font-bold text-sm hover:bg-indigo-700 w-full transition-colors">Salvar Cadastro</button>
+                    <button 
+                        type="submit" 
+                        disabled={formLoading}
+                        className="bg-indigo-600 text-white h-10 px-6 rounded-lg font-bold text-sm hover:bg-indigo-700 w-full transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                        {formLoading ? 'Salvando...' : <><Save className="w-4 h-4" /> Salvar</>}
+                    </button>
                     <button type="button" onClick={() => setShowTeacherForm(false)} className="bg-slate-100 text-slate-500 h-10 px-4 rounded-lg"><X /></button>
                   </div>
                 </form>
+                <p className="mt-4 text-[10px] text-slate-400 italic flex items-center gap-1">
+                    <Info className="w-3 h-3" /> Após salvar, o professor deve ser criado manualmente no Supabase Auth com este mesmo e-mail.
+                </p>
               </div>
             )}
 

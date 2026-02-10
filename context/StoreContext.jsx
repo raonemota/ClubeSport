@@ -142,8 +142,20 @@ export const StoreProvider = ({ children }) => {
       setUsers([...users, newUser]); 
       return { success: true }; 
     }
-    fetchData(); 
-    return { success: true };
+    
+    // NOTA: No Supabase, você não pode criar usuários auth.users via código frontend comum por segurança.
+    // O admin deve criar o usuário no painel do Supabase e o perfil será gerado via Trigger SQL (ou manualmente).
+    // Aqui fazemos o upsert apenas na tabela profiles para consistência de dados.
+    const { error } = await supabase.from('profiles').upsert([{
+      email: userData.email,
+      name: userData.name,
+      phone: userData.phone,
+      role: role,
+      must_change_password: true
+    }]);
+
+    if (!error) fetchData(); 
+    return { success: !error };
   };
 
   const updateBookingStatus = async (bookingId, status) => {
