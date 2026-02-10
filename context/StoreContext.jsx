@@ -31,14 +31,45 @@ export const StoreProvider = ({ children }) => {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) fetchUserProfile(session.user.id);
-      else setLoading(false);
-    });
+    // Inicialização segura da sessão
+    const initSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          // Se houver erro de token inválido, forçamos logout para limpar o storage
+          console.warn("Erro ao recuperar sessão, limpando dados locais:", error.message);
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) fetchUserProfile(session.user.id);
-      else { setCurrentUser(null); setLoading(false); }
+        if (session) {
+          await fetchUserProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Erro inesperado na inicialização:", err);
+        setLoading(false);
+      }
+    };
+
+    initSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setLoading(false);
+      } else if (session) {
+        // Apenas busca o perfil se o usuário mudou ou se ainda não temos o perfil carregado
+        if (!currentUser || currentUser.id !== session.user.id) {
+            await fetchUserProfile(session.user.id);
+        }
+      } else {
+        setCurrentUser(null);
+        setLoading(false);
+      }
     });
 
     fetchData();
@@ -48,7 +79,14 @@ export const StoreProvider = ({ children }) => {
   const fetchUserProfile = async (userId) => {
     if (!supabase) return;
     try {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      
+      if (error) {
+        console.error("Erro ao buscar perfil:", error);
+        // Se o usuário existe na Auth mas não tem perfil, isso é um estado inconsistente
+        // mas não devemos travar o app.
+      }
+
       if (data) {
         if (data.role === UserRole.INACTIVE) {
            await supabase.auth.signOut();
@@ -57,8 +95,11 @@ export const StoreProvider = ({ children }) => {
         }
         setCurrentUser({ ...data, planType: data.plan_type, mustChangePassword: data.must_change_password });
       }
-    } catch (error) { console.error(error); } 
-    finally { setLoading(false); }
+    } catch (error) { 
+      console.error(error); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const fetchData = async () => {
@@ -127,10 +168,20 @@ export const StoreProvider = ({ children }) => {
     };
   };
 
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) return;
+    const permission = await Notification.requestPermission();
+    setNotificationsEnabled(permission === 'granted');
+  };
+
+  const getSessionBookingsCount = (sessionId) => {
+    return bookings.filter(b => b.sessionId === sessionId && b.status !== BookingStatus.CANCELLED_BY_STUDENT && b.status !== BookingStatus.CANCELLED_BY_ADMIN).length;
+  };
+
   return (
     <StoreContext.Provider value={{
-      currentUser, users, modalities, sessions, bookings, loading, bookingReleaseHour,
-      login, logout, addSession, registerUser, updateBookingStatus, getStudentStats,
+      currentUser, users, modalities, sessions, bookings, loading, bookingReleaseHour, notificationsEnabled,
+      login, logout, addSession, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount,
       addModality: async (d) => { if (!supabase) setModalities([...modalities, {...d, id: Date.now().toString()}]); else await supabase.from('modalities').insert([{name: d.name, description: d.description, image_url: d.imageUrl}]); fetchData(); },
       updateUser: async (id, upd) => { if (!supabase) setUsers(users.map(u => u.id === id ? {...u, ...upd} : u)); else await supabase.from('profiles').update({name: upd.name, phone: upd.phone, plan_type: upd.planType, role: upd.role}).eq('id', id); fetchData(); },
       deleteUser: async (id) => { if (!supabase) setUsers(users.filter(u => u.id !== id)); else await supabase.from('profiles').update({role: UserRole.INACTIVE}).eq('id', id); fetchData(); },
@@ -144,6 +195,15 @@ export const StoreProvider = ({ children }) => {
         if (!supabase) setBookings(bookings.map(b => b.id === bid ? {...b, status} : b));
         else await supabase.from('bookings').update({status}).eq('id', bid);
         fetchData();
+      },
+      updatePassword: async (newPassword) => {
+          if (!supabase) return true;
+          const { error } = await supabase.auth.updateUser({ password: newPassword });
+          if (!error) {
+              await supabase.from('profiles').update({ must_change_password: false }).eq('id', currentUser.id);
+              setCurrentUser({ ...currentUser, mustChangePassword: false });
+          }
+          return !error;
       }
     }}>
       {children}

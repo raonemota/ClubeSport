@@ -10,6 +10,7 @@ import { StudentProfile } from './pages/student/StudentProfile';
 import { TeacherPortal } from './pages/teacher/TeacherPortal';
 import { ForcePasswordChange } from './pages/ForcePasswordChange';
 import { UserRole } from './types.js';
+import { Loader2 } from 'lucide-react';
 
 const ProtectedRoute = ({ children, role }) => {
   const { currentUser } = useStore();
@@ -34,6 +35,19 @@ const ConditionalNavbar = () => {
 };
 
 const AppContent = () => {
+  const { loading } = useStore();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+          <p className="text-slate-500 text-sm font-medium">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Router>
       <div className="min-h-screen flex flex-col bg-slate-50">

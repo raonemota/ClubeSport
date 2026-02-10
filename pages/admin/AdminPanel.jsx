@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { Plus, Trash2, Calendar, Dumbbell, Users, X, Edit2, FileText, ClipboardList, GraduationCap, Phone, Mail, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Plus, Trash2, Calendar, Dumbbell, Users, X, Edit2, FileText, ClipboardList, GraduationCap, Phone, Mail, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { UserRole, BookingStatus } from '../../types.js';
 
@@ -20,6 +20,14 @@ export const AdminPanel = () => {
     await registerUser(teacherForm, UserRole.TEACHER);
     setTeacherForm({ name: '', phone: '', email: '', mainModality: '' });
     setShowTeacherForm(false);
+  };
+
+  const getSessionStats = (sessionId) => {
+      const sessionBookings = bookings.filter(b => b.sessionId === sessionId && b.status !== BookingStatus.CANCELLED_BY_STUDENT && b.status !== BookingStatus.CANCELLED_BY_ADMIN);
+      const attended = sessionBookings.filter(b => b.status === BookingStatus.ATTENDED).length;
+      const missed = sessionBookings.filter(b => b.status === BookingStatus.MISSED).length;
+      const confirmed = sessionBookings.filter(b => b.status === BookingStatus.CONFIRMED).length;
+      return { total: sessionBookings.length, attended, missed, confirmed };
   };
 
   const NavButton = ({ tabId, icon: Icon, label }) => (
@@ -44,6 +52,7 @@ export const AdminPanel = () => {
       </aside>
 
       <main className="flex-1 p-8">
+        {/* --- ABA PROFESSORES --- */}
         {activeTab === 'teachers' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -109,6 +118,70 @@ export const AdminPanel = () => {
           </div>
         )}
 
+        {/* --- ABA ALUNOS --- */}
+        {activeTab === 'students' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-bold text-slate-800">Gestão de Alunos</h1>
+              <div className="text-sm text-slate-500">
+                Total de Alunos: <span className="font-bold text-slate-900">{students.length}</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 font-bold text-slate-500">
+                  <tr>
+                    <th className="px-6 py-4 text-left">Aluno</th>
+                    <th className="px-6 py-4 text-left">Plano / Observação</th>
+                    <th className="px-6 py-4 text-left">Contato</th>
+                    <th className="px-6 py-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {students.map(s => (
+                    <tr key={s.id} className="hover:bg-slate-50">
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-slate-900">{s.name}</div>
+                        <div className="text-xs text-slate-400">ID: {s.id.substring(0,6)}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-block px-2 py-1 rounded bg-indigo-50 text-indigo-700 text-xs font-bold mb-1">
+                          {s.planType || 'Padrão'}
+                        </span>
+                        {s.observation && (
+                          <p className="text-xs text-slate-500 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> {s.observation}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-slate-500">
+                        <div className="flex flex-col">
+                          <span className="flex items-center gap-1 text-xs"><Mail className="w-3 h-3" /> {s.email}</span>
+                          <span className="flex items-center gap-1 text-xs"><Phone className="w-3 h-3" /> {s.phone || 'Sem telefone'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                            onClick={() => deleteUser(s.id)} 
+                            className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Desativar Aluno"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {students.length === 0 && (
+                    <tr><td colSpan="4" className="text-center py-12 text-slate-400">Nenhum aluno encontrado.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* --- ABA RELATÓRIOS --- */}
         {activeTab === 'reports' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -120,9 +193,68 @@ export const AdminPanel = () => {
             </div>
 
             {reportSubTab === 'attendance' ? (
-              <div className="bg-white p-6 rounded-xl border shadow-sm">
-                <p className="text-slate-500 text-sm mb-4">Selecione uma aula no histórico para ver a lista de presença detalhada.</p>
-                {/* Aqui ficaria a listagem de aulas já existente, filtrando presenças */}
+              <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 font-bold text-slate-500">
+                    <tr>
+                      <th className="px-6 py-4 text-left">Data/Hora</th>
+                      <th className="px-6 py-4 text-left">Modalidade & Instrutor</th>
+                      <th className="px-6 py-4 text-center">Inscritos</th>
+                      <th className="px-6 py-4 text-center">Frequência</th>
+                      <th className="px-6 py-4 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {sessions
+                        .sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+                        .map(session => {
+                            const modality = modalities.find(m => m.id === session.modalityId);
+                            const stats = getSessionStats(session.id);
+                            const attendanceRate = stats.total > 0 ? Math.round((stats.attended / stats.total) * 100) : 0;
+                            
+                            return (
+                                <tr key={session.id} className="hover:bg-slate-50">
+                                    <td className="px-6 py-4">
+                                        <div className="font-bold text-slate-700">
+                                            {format(parseISO(session.startTime), 'dd/MM/yyyy')}
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                            {format(parseISO(session.startTime), 'HH:mm')} ({session.durationMinutes} min)
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="font-medium text-slate-900">{modality?.name || 'Geral'}</div>
+                                        <div className="text-xs text-slate-500">{session.instructor}</div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <span className="font-bold text-slate-700">{stats.total}</span>
+                                        <span className="text-slate-400 text-xs">/{session.capacity}</span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex text-xs justify-between font-medium">
+                                                <span className="text-green-600">{stats.attended} Presenças</span>
+                                                <span className="text-red-500">{stats.missed} Faltas</span>
+                                            </div>
+                                            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                                <div className="bg-green-500 h-full" style={{ width: `${attendanceRate}%` }}></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        {stats.confirmed > 0 && stats.attended === 0 && stats.missed === 0 ? (
+                                             <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-[10px] font-bold uppercase">Aguardando Chamada</span>
+                                        ) : stats.total === 0 ? (
+                                             <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-[10px] font-bold uppercase">Sem Alunos</span>
+                                        ) : (
+                                             <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-bold uppercase">Finalizada</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                    })}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
