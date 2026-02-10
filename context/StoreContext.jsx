@@ -31,13 +31,11 @@ export const StoreProvider = ({ children }) => {
       return;
     }
 
-    // Inicialização segura da sessão
     const initSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          // Se houver erro de token inválido, forçamos logout para limpar o storage
           console.warn("Erro ao recuperar sessão, limpando dados locais:", error.message);
           await supabase.auth.signOut();
           setLoading(false);
@@ -62,7 +60,6 @@ export const StoreProvider = ({ children }) => {
         setCurrentUser(null);
         setLoading(false);
       } else if (session) {
-        // Apenas busca o perfil se o usuário mudou ou se ainda não temos o perfil carregado
         if (!currentUser || currentUser.id !== session.user.id) {
             await fetchUserProfile(session.user.id);
         }
@@ -80,13 +77,6 @@ export const StoreProvider = ({ children }) => {
     if (!supabase) return;
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      
-      if (error) {
-        console.error("Erro ao buscar perfil:", error);
-        // Se o usuário existe na Auth mas não tem perfil, isso é um estado inconsistente
-        // mas não devemos travar o app.
-      }
-
       if (data) {
         if (data.role === UserRole.INACTIVE) {
            await supabase.auth.signOut();
@@ -95,11 +85,8 @@ export const StoreProvider = ({ children }) => {
         }
         setCurrentUser({ ...data, planType: data.plan_type, mustChangePassword: data.must_change_password });
       }
-    } catch (error) { 
-      console.error(error); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (error) { console.error(error); } 
+    finally { setLoading(false); }
   };
 
   const fetchData = async () => {
@@ -137,13 +124,24 @@ export const StoreProvider = ({ children }) => {
     fetchData();
   };
 
+  const deleteSession = async (sessionId) => {
+    if (!supabase) { setSessions(sessions.filter(s => s.id !== sessionId)); return; }
+    await supabase.from('class_sessions').delete().eq('id', sessionId);
+    fetchData();
+  };
+
+  const deleteModality = async (modalityId) => {
+    if (!supabase) { setModalities(modalities.filter(m => m.id !== modalityId)); return; }
+    await supabase.from('modalities').delete().eq('id', modalityId);
+    fetchData();
+  };
+
   const registerUser = async (userData, role = UserRole.STUDENT) => {
     if (!supabase) { 
       const newUser = { ...userData, id: Math.random().toString(36).substr(2, 9), role, mustChangePassword: true };
       setUsers([...users, newUser]); 
       return { success: true }; 
     }
-    // Lógica simplificada para demonstração: No Supabase real, usaria Edge Functions para criar usuários auth
     fetchData(); 
     return { success: true };
   };
@@ -181,7 +179,7 @@ export const StoreProvider = ({ children }) => {
   return (
     <StoreContext.Provider value={{
       currentUser, users, modalities, sessions, bookings, loading, bookingReleaseHour, notificationsEnabled,
-      login, logout, addSession, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount,
+      login, logout, addSession, deleteSession, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount,
       addModality: async (d) => { if (!supabase) setModalities([...modalities, {...d, id: Date.now().toString()}]); else await supabase.from('modalities').insert([{name: d.name, description: d.description, image_url: d.imageUrl}]); fetchData(); },
       updateUser: async (id, upd) => { if (!supabase) setUsers(users.map(u => u.id === id ? {...u, ...upd} : u)); else await supabase.from('profiles').update({name: upd.name, phone: upd.phone, plan_type: upd.planType, role: upd.role}).eq('id', id); fetchData(); },
       deleteUser: async (id) => { if (!supabase) setUsers(users.filter(u => u.id !== id)); else await supabase.from('profiles').update({role: UserRole.INACTIVE}).eq('id', id); fetchData(); },

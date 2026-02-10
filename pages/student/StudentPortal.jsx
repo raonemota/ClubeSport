@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { CheckCircle, XCircle, Clock, Calendar as CalendarIcon, ChevronRight, Lock, Tag, AlertCircle, Bell, BellOff, ShieldAlert } from 'lucide-react';
-import { format, isPast, isToday, isTomorrow, addDays, differenceInCalendarDays } from 'date-fns';
+import { format, isPast, isToday, isTomorrow, addDays, differenceInCalendarDays, isSameDay } from 'date-fns';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { FeedbackModal } from '../../components/FeedbackModal';
 
@@ -25,6 +25,7 @@ const DailyClassGroup = ({ date, modalityId, sessions, onBookSession }) => {
     if (isDayTomorrow) dateLabel = "Amanhã";
 
     let isLocked = false;
+    // Lógica de bloqueio visual: Amanhã só libera se a hora atual for maior que a hora de liberação
     if (!isDayToday && now.getHours() < bookingReleaseHour) isLocked = true;
 
     const sortedSessions = [...sessions].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
@@ -124,9 +125,13 @@ export const StudentPortal = () => {
     .filter(b => b.userId === currentUser?.id)
     .sort((a, b) => new Date(b.bookedAt).getTime() - new Date(a.bookedAt).getTime());
 
+  // Lógica de Filtro Estrito: Apenas Hoje e Amanhã
   const filteredSessions = sessions
     .filter(s => filterModality === 'all' || s.modalityId === filterModality)
-    .filter(s => !isPast(new Date(s.startTime)) || isToday(new Date(s.startTime)))
+    .filter(s => {
+        const sDate = new Date(s.startTime);
+        return isToday(sDate) || isTomorrow(sDate);
+    })
     .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   const groupedSessions = filteredSessions.reduce((acc, session) => {
@@ -163,7 +168,14 @@ export const StudentPortal = () => {
       {activeTab === 'browse' ? (
         <div className="space-y-6">
             <div className="flex gap-2 overflow-x-auto pb-2">{modalities.map(m => <button key={m.id} onClick={() => setFilterModality(m.id)} className={`px-4 py-1.5 rounded-full text-xs font-bold border whitespace-nowrap ${filterModality === m.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600'}`}>{m.name}</button>)}<button onClick={() => setFilterModality('all')} className="px-4 py-1.5 rounded-full text-xs font-bold border bg-white">Ver Todas</button></div>
-            {Object.values(groupedSessions).map(group => <DailyClassGroup key={`${group.date}_${group.modalityId}`} date={group.date} modalityId={group.modalityId} sessions={group.sessions} onBookSession={(s) => setConfirmBookingModal({ isOpen: true, session: s })} />)}
+            {Object.values(groupedSessions).length > 0 ? (
+                Object.values(groupedSessions).map(group => <DailyClassGroup key={`${group.date}_${group.modalityId}`} date={group.date} modalityId={group.modalityId} sessions={group.sessions} onBookSession={(s) => setConfirmBookingModal({ isOpen: true, session: s })} />)
+            ) : (
+                <div className="text-center py-12 bg-white rounded-xl border border-dashed text-slate-400">
+                    <CalendarIcon className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                    <p>Não há aulas disponíveis para Hoje ou Amanhã.</p>
+                </div>
+            )}
         </div>
       ) : (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -171,6 +183,7 @@ export const StudentPortal = () => {
                 const session = sessions.find(s => s.id === b.sessionId);
                 return session ? <MyBookingCard key={b.id} session={session} bookingId={b.id} bookedAt={b.bookedAt} status={b.status} onRequestCancel={(id) => setCancelModal({ isOpen: true, bookingId: id })} /> : null;
             })}
+            {myBookings.length === 0 && <p className="text-gray-500 text-center col-span-3">Você ainda não tem agendamentos.</p>}
          </div>
       )}
     </div>

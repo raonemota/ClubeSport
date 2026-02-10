@@ -1,16 +1,26 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { Plus, Trash2, Calendar, Dumbbell, Users, X, Edit2, FileText, ClipboardList, GraduationCap, Phone, Mail, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Calendar, Dumbbell, Users, X, Edit2, FileText, ClipboardList, GraduationCap, Phone, Mail, CheckCircle2, XCircle, Clock, AlertCircle, Filter } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { UserRole, BookingStatus } from '../../types.js';
 
 export const AdminPanel = () => {
-  const { modalities, sessions, users, bookings, registerUser, updateUser, deleteUser, getStudentStats } = useStore();
+  const { modalities, sessions, users, bookings, registerUser, updateUser, deleteUser, getStudentStats, addModality, deleteModality, addSession, deleteSession } = useStore();
   const [activeTab, setActiveTab] = useState('reports');
+  
+  // States para Formulários
   const [showTeacherForm, setShowTeacherForm] = useState(false);
   const [teacherForm, setTeacherForm] = useState({ name: '', phone: '', email: '', mainModality: '' });
-  const [reportSubTab, setReportSubTab] = useState('attendance'); // 'attendance' or 'students'
+  
+  const [showModalityForm, setShowModalityForm] = useState(false);
+  const [modalityForm, setModalityForm] = useState({ name: '', description: '', imageUrl: '' });
+
+  const [showSessionForm, setShowSessionForm] = useState(false);
+  const [sessionForm, setSessionForm] = useState({ modalityId: '', instructor: '', date: '', time: '', durationMinutes: 60, capacity: 10, category: '' });
+
+  const [reportSubTab, setReportSubTab] = useState('attendance');
+  const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
 
   const teachers = users.filter(u => u.role === UserRole.TEACHER);
   const students = users.filter(u => u.role === UserRole.STUDENT);
@@ -20,6 +30,21 @@ export const AdminPanel = () => {
     await registerUser(teacherForm, UserRole.TEACHER);
     setTeacherForm({ name: '', phone: '', email: '', mainModality: '' });
     setShowTeacherForm(false);
+  };
+
+  const handleModalitySubmit = async (e) => {
+    e.preventDefault();
+    await addModality(modalityForm);
+    setModalityForm({ name: '', description: '', imageUrl: '' });
+    setShowModalityForm(false);
+  };
+
+  const handleSessionSubmit = async (e) => {
+    e.preventDefault();
+    const startTime = new Date(`${sessionForm.date}T${sessionForm.time}`).toISOString();
+    await addSession({ ...sessionForm, startTime });
+    setSessionForm({ modalityId: '', instructor: '', date: '', time: '', durationMinutes: 60, capacity: 10, category: '' });
+    setShowSessionForm(false);
   };
 
   const getSessionStats = (sessionId) => {
@@ -52,6 +77,161 @@ export const AdminPanel = () => {
       </aside>
 
       <main className="flex-1 p-8">
+        {/* --- ABA MODALIDADES --- */}
+        {activeTab === 'modalities' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-bold text-slate-800">Modalidades Esportivas</h1>
+              <button onClick={() => setShowModalityForm(!showModalityForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-sm">
+                <Plus className="w-4 h-4" /> Nova Modalidade
+              </button>
+            </div>
+
+            {showModalityForm && (
+              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
+                <form onSubmit={handleModalitySubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                       <label className="text-xs font-bold text-slate-500">Nome da Modalidade</label>
+                       <input type="text" value={modalityForm.name} onChange={e => setModalityForm({...modalityForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Natação" required />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-xs font-bold text-slate-500">URL da Imagem</label>
+                       <input type="text" value={modalityForm.imageUrl} onChange={e => setModalityForm({...modalityForm, imageUrl: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" placeholder="https://..." />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-xs font-bold text-slate-500">Descrição</label>
+                     <textarea value={modalityForm.description} onChange={e => setModalityForm({...modalityForm, description: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" rows="2" placeholder="Breve descrição..." />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setShowModalityForm(false)} className="bg-slate-100 text-slate-500 px-4 py-2 rounded-lg">Cancelar</button>
+                    <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700">Salvar</button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {modalities.map(modality => (
+                <div key={modality.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col group">
+                  <div className="h-32 bg-slate-200 relative overflow-hidden">
+                    {modality.imageUrl ? (
+                      <img src={modality.imageUrl} alt={modality.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-slate-400"><Dumbbell className="w-8 h-8" /></div>
+                    )}
+                    <button onClick={() => deleteModality(modality.id)} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full text-red-500 hover:text-red-700 hover:bg-white transition-all shadow-sm opacity-0 group-hover:opacity-100">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="p-4 flex-grow">
+                    <h3 className="font-bold text-lg text-slate-800 mb-1">{modality.name}</h3>
+                    <p className="text-sm text-slate-500 line-clamp-3">{modality.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --- ABA GRADE HORÁRIA --- */}
+        {activeTab === 'schedule' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-bold text-slate-800">Grade Horária</h1>
+              <button onClick={() => setShowSessionForm(!showSessionForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-sm">
+                <Plus className="w-4 h-4" /> Nova Aula
+              </button>
+            </div>
+
+            {showSessionForm && (
+              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
+                 <form onSubmit={handleSessionSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500">Modalidade</label>
+                      <select value={sessionForm.modalityId} onChange={e => setSessionForm({...sessionForm, modalityId: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 bg-white" required>
+                        <option value="">Selecione...</option>
+                        {modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500">Data</label>
+                      <input type="date" value={sessionForm.date} onChange={e => setSessionForm({...sessionForm, date: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500">Hora</label>
+                      <input type="time" value={sessionForm.time} onChange={e => setSessionForm({...sessionForm, time: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" required />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                     <div className="space-y-1 md:col-span-2">
+                        <label className="text-xs font-bold text-slate-500">Instrutor</label>
+                        <input type="text" value={sessionForm.instructor} onChange={e => setSessionForm({...sessionForm, instructor: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Nome do Professor" required />
+                     </div>
+                     <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500">Capacidade</label>
+                        <input type="number" value={sessionForm.capacity} onChange={e => setSessionForm({...sessionForm, capacity: parseInt(e.target.value)})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" min="1" required />
+                     </div>
+                     <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500">Categoria (Opcional)</label>
+                        <input type="text" value={sessionForm.category} onChange={e => setSessionForm({...sessionForm, category: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Iniciante" />
+                     </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => setShowSessionForm(false)} className="bg-slate-100 text-slate-500 px-4 py-2 rounded-lg">Cancelar</button>
+                    <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700">Adicionar Aula</button>
+                  </div>
+                 </form>
+              </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 font-bold text-slate-500">
+                  <tr>
+                    <th className="px-6 py-4 text-left">Data / Hora</th>
+                    <th className="px-6 py-4 text-left">Modalidade</th>
+                    <th className="px-6 py-4 text-left">Instrutor / Categoria</th>
+                    <th className="px-6 py-4 text-center">Vagas</th>
+                    <th className="px-6 py-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {sessions
+                    .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+                    .map(session => {
+                      const modality = modalities.find(m => m.id === session.modalityId);
+                      return (
+                        <tr key={session.id} className="hover:bg-slate-50">
+                          <td className="px-6 py-4">
+                             <div className="font-bold text-slate-800">{format(parseISO(session.startTime), 'dd/MM/yyyy')}</div>
+                             <div className="text-xs text-slate-500 font-medium">{format(parseISO(session.startTime), 'HH:mm')}</div>
+                          </td>
+                          <td className="px-6 py-4 font-medium text-slate-700">{modality?.name}</td>
+                          <td className="px-6 py-4">
+                             <div className="text-slate-900">{session.instructor}</div>
+                             {session.category && <span className="text-[10px] uppercase bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-500">{session.category}</span>}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                             <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-xs">{session.capacity}</span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                             <button onClick={() => deleteSession(session.id)} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          </td>
+                        </tr>
+                      );
+                  })}
+                  {sessions.length === 0 && (
+                     <tr><td colSpan="5" className="text-center py-12 text-slate-400">Nenhuma aula cadastrada na grade.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* --- ABA PROFESSORES --- */}
         {activeTab === 'teachers' && (
           <div className="space-y-6">
@@ -193,68 +373,87 @@ export const AdminPanel = () => {
             </div>
 
             {reportSubTab === 'attendance' ? (
-              <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                  <thead className="bg-slate-50 font-bold text-slate-500">
-                    <tr>
-                      <th className="px-6 py-4 text-left">Data/Hora</th>
-                      <th className="px-6 py-4 text-left">Modalidade & Instrutor</th>
-                      <th className="px-6 py-4 text-center">Inscritos</th>
-                      <th className="px-6 py-4 text-center">Frequência</th>
-                      <th className="px-6 py-4 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {sessions
-                        .sort((a,b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-                        .map(session => {
-                            const modality = modalities.find(m => m.id === session.modalityId);
-                            const stats = getSessionStats(session.id);
-                            const attendanceRate = stats.total > 0 ? Math.round((stats.attended / stats.total) * 100) : 0;
-                            
-                            return (
-                                <tr key={session.id} className="hover:bg-slate-50">
-                                    <td className="px-6 py-4">
-                                        <div className="font-bold text-slate-700">
-                                            {format(parseISO(session.startTime), 'dd/MM/yyyy')}
-                                        </div>
-                                        <div className="text-xs text-slate-500">
-                                            {format(parseISO(session.startTime), 'HH:mm')} ({session.durationMinutes} min)
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="font-medium text-slate-900">{modality?.name || 'Geral'}</div>
-                                        <div className="text-xs text-slate-500">{session.instructor}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <span className="font-bold text-slate-700">{stats.total}</span>
-                                        <span className="text-slate-400 text-xs">/{session.capacity}</span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex text-xs justify-between font-medium">
-                                                <span className="text-green-600">{stats.attended} Presenças</span>
-                                                <span className="text-red-500">{stats.missed} Faltas</span>
-                                            </div>
-                                            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                                                <div className="bg-green-500 h-full" style={{ width: `${attendanceRate}%` }}></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        {stats.confirmed > 0 && stats.attended === 0 && stats.missed === 0 ? (
-                                             <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-[10px] font-bold uppercase">Aguardando Chamada</span>
-                                        ) : stats.total === 0 ? (
-                                             <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-[10px] font-bold uppercase">Sem Alunos</span>
-                                        ) : (
-                                             <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-bold uppercase">Finalizada</span>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                    })}
-                  </tbody>
-                </table>
+              <div className="space-y-4">
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+                    <Filter className="w-5 h-5 text-slate-400" />
+                    <div className="flex items-center gap-2">
+                         <label className="text-sm font-bold text-slate-600">Filtrar por Data:</label>
+                         <input 
+                            type="date" 
+                            value={reportDate} 
+                            onChange={(e) => setReportDate(e.target.value)} 
+                            className="border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700"
+                         />
+                    </div>
+                </div>
+                <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50 font-bold text-slate-500">
+                      <tr>
+                        <th className="px-6 py-4 text-left">Hora</th>
+                        <th className="px-6 py-4 text-left">Modalidade & Instrutor</th>
+                        <th className="px-6 py-4 text-center">Inscritos</th>
+                        <th className="px-6 py-4 text-center">Frequência</th>
+                        <th className="px-6 py-4 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {sessions
+                          .filter(session => isSameDay(parseISO(session.startTime), parseISO(reportDate)))
+                          .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+                          .map(session => {
+                              const modality = modalities.find(m => m.id === session.modalityId);
+                              const stats = getSessionStats(session.id);
+                              const attendanceRate = stats.total > 0 ? Math.round((stats.attended / stats.total) * 100) : 0;
+                              
+                              return (
+                                  <tr key={session.id} className="hover:bg-slate-50">
+                                      <td className="px-6 py-4">
+                                          <div className="font-bold text-slate-700 flex items-center gap-2">
+                                              <Clock className="w-4 h-4 text-slate-400" />
+                                              {format(parseISO(session.startTime), 'HH:mm')} 
+                                          </div>
+                                          <div className="text-xs text-slate-400 pl-6">
+                                              {session.durationMinutes} min
+                                          </div>
+                                      </td>
+                                      <td className="px-6 py-4">
+                                          <div className="font-medium text-slate-900">{modality?.name || 'Geral'}</div>
+                                          <div className="text-xs text-slate-500">{session.instructor}</div>
+                                      </td>
+                                      <td className="px-6 py-4 text-center">
+                                          <span className="font-bold text-slate-700">{stats.total}</span>
+                                          <span className="text-slate-400 text-xs">/{session.capacity}</span>
+                                      </td>
+                                      <td className="px-6 py-4">
+                                          <div className="flex flex-col gap-1">
+                                              <div className="flex text-xs justify-between font-medium">
+                                                  <span className="text-green-600">{stats.attended} Presenças</span>
+                                                  <span className="text-red-500">{stats.missed} Faltas</span>
+                                              </div>
+                                              <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                                  <div className="bg-green-500 h-full" style={{ width: `${attendanceRate}%` }}></div>
+                                              </div>
+                                          </div>
+                                      </td>
+                                      <td className="px-6 py-4 text-center">
+                                          {stats.confirmed > 0 && stats.attended === 0 && stats.missed === 0 ? (
+                                               <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-[10px] font-bold uppercase">Aguardando Chamada</span>
+                                          ) : stats.total === 0 ? (
+                                               <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-[10px] font-bold uppercase">Sem Alunos</span>
+                                          ) : (
+                                               <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-bold uppercase">Finalizada</span>
+                                          )}
+                                      </td>
+                                  </tr>
+                              );
+                      })}
+                      {sessions.filter(session => isSameDay(parseISO(session.startTime), parseISO(reportDate))).length === 0 && (
+                          <tr><td colSpan="5" className="text-center py-12 text-slate-400 italic">Nenhuma aula encontrada para esta data.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
               <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
