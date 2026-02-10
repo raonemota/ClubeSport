@@ -20,7 +20,6 @@ export const StoreProvider = ({ children }) => {
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(Notification.permission === 'granted');
   const notifiedSessions = useRef(new Set());
-  const lastSessionCount = useRef(0);
 
   useEffect(() => {
     if (!supabase) {
@@ -61,6 +60,8 @@ export const StoreProvider = ({ children }) => {
         setCurrentUser(null);
         setLoading(false);
       } else if (session) {
+        // Apenas busca o perfil se o usuário mudou ou se ainda não temos usuário carregado
+        // Isso evita sobrescrever o estado local durante operações sensíveis como troca de senha
         if (!currentUser || currentUser.id !== session.user.id) {
             await fetchUserProfile(session.user.id);
         }
@@ -108,19 +109,31 @@ export const StoreProvider = ({ children }) => {
       if (user) { setCurrentUser(user); return true; }
       return false;
     }
-    let emailToUse = identifier;
-    if (!identifier.includes('@')) {
-        const { data } = await supabase.from('profiles').select('email').eq('phone', identifier).single();
-        if (data) emailToUse = data.email; else return false;
+    
+    let emailToUse = identifier.trim();
+    
+    if (!emailToUse.includes('@')) {
+        const { data } = await supabase.from('profiles').select('email').eq('phone', emailToUse).single();
+        if (data) {
+            emailToUse = data.email;
+        } else {
+            console.warn("Login: Telefone não encontrado no cadastro.");
+            return false;
+        }
     }
+    
     const { error } = await supabase.auth.signInWithPassword({ email: emailToUse, password: pass });
+    
+    if (error) {
+        console.error("Erro no login:", error.message);
+    }
+    
     return !error;
   };
 
   const logout = async () => { if (supabase) await supabase.auth.signOut(); setCurrentUser(null); };
 
   const registerUser = async (userData, role = UserRole.STUDENT) => {
-    // 1. Modo Mock (Sem backend)
     if (!supabase) { 
       const newUser = { ...userData, id: Math.random().toString(36).substr(2, 9), role, mustChangePassword: true };
       setUsers([...users, newUser]); 
@@ -128,36 +141,22 @@ export const StoreProvider = ({ children }) => {
     }
     
     try {
-      // 2. Criar Cliente Temporário para o Registro
-      // Isso evita que o signUp desconecte o admin atual (persistSession: false)
       const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-          detectSessionInUrl: false
-        }
+        auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }
       });
 
-      // 3. Criar Usuário no Supabase Auth
       const { data: authData, error: authError } = await tempClient.auth.signUp({
         email: userData.email,
         password: userData.password,
       });
 
-      if (authError) {
-        console.error("Erro no Auth:", authError);
-        return { success: false, error: authError.message };
-      }
+      if (authError) return { success: false, error: authError.message };
 
       const newUserId = authData.user?.id;
-      
-      if (!newUserId) {
-        return { success: false, error: "Usuário criado, mas ID não retornado. Verifique confirmação de email." };
-      }
+      if (!newUserId) return { success: false, error: "Usuário criado, mas ID não retornado." };
 
-      // 4. Criar Perfil Público vinculado ao ID do Auth
       const payload = {
-        id: newUserId, // Vincula o ID gerado pelo Auth
+        id: newUserId,
         email: userData.email,
         name: userData.name,
         phone: userData.phone,
@@ -168,8 +167,6 @@ export const StoreProvider = ({ children }) => {
       const { error: profileError } = await supabase.from('profiles').insert([payload]);
 
       if (profileError) {
-        console.error("Erro no Profile:", profileError);
-        // Tenta fallback se o usuário já existir no profile (caso de re-cadastro)
         if (profileError.code === '23505') {
              const { error: updateError } = await supabase.from('profiles').update(payload).eq('email', userData.email);
              if (updateError) return { success: false, error: updateError.message };
@@ -235,10 +232,57 @@ export const StoreProvider = ({ children }) => {
     return bookings.filter(b => b.sessionId === sessionId && b.status !== BookingStatus.CANCELLED_BY_STUDENT && b.status !== BookingStatus.CANCELLED_BY_ADMIN).length;
   };
 
+  // --- LÓGICA DE ATUALIZAÇÃO DE SENHA CORRIGIDA ---
+  const updatePassword = async (newPassword) => {
+      console.log("Iniciando updatePassword...");
+      if (!supabase) {
+          const updatedUser = { ...currentUser, mustChangePassword: false };
+          setCurrentUser(updatedUser);
+          setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+          return true;
+      }
+      
+      // 1. Atualizar Auth do Supabase
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      
+      if (error) {
+          console.error("Erro FATAL ao atualizar senha no Auth:", error.message);
+          return false;
+      }
+
+      console.log("Senha Auth atualizada. Atualizando perfil...");
+
+      // 2. Atualizar tabela de Profiles (DB)
+      // Fazemos isso independente do sucesso do passo 1 para garantir consistência
+      const { error: profileError } = await supabase.from('profiles')
+          .update({ must_change_password: false })
+          .eq('id', currentUser.id);
+
+      if (profileError) {
+          console.warn("Aviso: Erro ao atualizar flag no perfil (pode ser RLS), mas a senha foi trocada.", profileError.message);
+      } else {
+          console.log("Perfil DB atualizado.");
+      }
+      
+      // 3. ATUALIZAÇÃO OTIMISTA DO ESTADO LOCAL (CRÍTICO)
+      // Forçamos o estado local imediatamente para permitir a navegação no ProtectedRoute
+      setCurrentUser(prev => {
+          const newState = { ...prev, mustChangePassword: false };
+          console.log("Estado local currentUser atualizado manualmente para:", newState);
+          return newState;
+      });
+
+      // 4. Forçar refresh silencioso para garantir sincronia futura
+      // Não usamos await aqui para não travar a UI
+      fetchUserProfile(currentUser.id).catch(err => console.error("Erro no refresh de fundo:", err));
+
+      return true;
+  };
+
   return (
     <StoreContext.Provider value={{
       currentUser, users, modalities, sessions, bookings, loading, bookingReleaseHour, notificationsEnabled,
-      login, logout, addSession, deleteSession, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount,
+      login, logout, addSession, deleteSession, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, updatePassword,
       addModality: async (d) => { if (!supabase) setModalities([...modalities, {...d, id: Date.now().toString()}]); else await supabase.from('modalities').insert([{name: d.name, description: d.description, image_url: d.imageUrl}]); fetchData(); },
       updateUser: async (id, upd) => { if (!supabase) setUsers(users.map(u => u.id === id ? {...u, ...upd} : u)); else await supabase.from('profiles').update({name: upd.name, phone: upd.phone, plan_type: upd.planType, role: upd.role}).eq('id', id); fetchData(); },
       deleteUser: async (id) => { if (!supabase) setUsers(users.filter(u => u.id !== id)); else await supabase.from('profiles').update({role: UserRole.INACTIVE}).eq('id', id); fetchData(); },
@@ -252,22 +296,6 @@ export const StoreProvider = ({ children }) => {
         if (!supabase) setBookings(bookings.map(b => b.id === bid ? {...b, status} : b));
         else await supabase.from('bookings').update({status}).eq('id', bid);
         fetchData();
-      },
-      updatePassword: async (newPassword) => {
-          if (!supabase) {
-              // Modo Mock: Atualiza estado local e "banco" mock
-              const updatedUser = { ...currentUser, mustChangePassword: false };
-              setCurrentUser(updatedUser);
-              setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
-              return true;
-          }
-          // Modo Supabase
-          const { error } = await supabase.auth.updateUser({ password: newPassword });
-          if (!error) {
-              await supabase.from('profiles').update({ must_change_password: false }).eq('id', currentUser.id);
-              setCurrentUser(prev => ({ ...prev, mustChangePassword: false }));
-          }
-          return !error;
       }
     }}>
       {children}

@@ -17,6 +17,7 @@ export const ForcePasswordChange = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        console.log("Iniciando submissão de troca de senha...");
 
         if (newPassword.length < 6) {
             setError('A senha deve ter pelo menos 6 caracteres.');
@@ -31,21 +32,24 @@ export const ForcePasswordChange = () => {
         setLoading(true);
         try {
             const success = await updatePassword(newPassword);
+            console.log("Resultado updatePassword:", success);
+            
             if (success) {
+                console.log("Sucesso! Preparando redirecionamento...");
                 // Pequeno delay para garantir que o React Context propagou a atualização
-                // do status 'mustChangePassword: false' para toda a aplicação
-                // antes de tentar navegar para uma rota protegida.
                 setTimeout(() => {
                     const dest = currentUser.role === UserRole.ADMIN ? '/admin' : currentUser.role === UserRole.TEACHER ? '/teacher' : '/student';
+                    console.log("Navegando para:", dest);
                     navigate(dest, { replace: true });
-                }, 500);
+                }, 800);
             } else {
-                setError('Erro ao atualizar a senha. Tente novamente.');
+                console.error("updatePassword retornou false.");
+                setError('Erro ao atualizar a senha. O servidor rejeitou a solicitação.');
                 setLoading(false);
             }
         } catch (err) {
-            console.error(err);
-            setError('Ocorreu um erro inesperado.');
+            console.error("Exceção capturada no handleSubmit:", err);
+            setError('Ocorreu um erro inesperado: ' + (err.message || err));
             setLoading(false);
         }
     };
