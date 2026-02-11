@@ -4,7 +4,7 @@ import { useStore } from '../../context/StoreContext';
 import { 
   Plus, Trash2, Edit, Calendar, Dumbbell, Users, X, FileText, 
   GraduationCap, Phone, Mail, Clock, Filter, Save, Info, 
-  AlertCircle, ShieldCheck, Key, Settings, ChevronDown, ChevronUp, UserX, UserCheck, Layers, CheckSquare, Square, Copy, Menu, ChevronLeft, ChevronRight, Timer, LayoutDashboard, Search, Camera, ListPlus, CalendarDays, Loader2
+  AlertCircle, ShieldCheck, Key, Settings, ChevronDown, ChevronUp, UserX, UserCheck, Layers, CheckSquare, Square, Copy, Menu, ChevronLeft, ChevronRight, Timer, LayoutDashboard, Search, Camera, ListPlus, CalendarDays, Loader2, UserCircle
 } from 'lucide-react';
 import { format, parseISO, isSameDay, addDays, startOfDay, endOfDay } from 'date-fns';
 import { UserRole, BookingStatus } from '../../types.js';
