@@ -13,7 +13,7 @@ import { ConfirmationModal } from '../../components/ConfirmationModal';
 export const AdminPanel = () => {
   const { 
     modalities, sessions, users, bookings, bookingReleaseHour, updateBookingReleaseHour,
-    registerUser, updateUser, deleteUser, addModality, deleteModality, addSession, updateSession, deleteSession,
+    registerUser, updateUser, deleteUser, addModality, updateModality, deleteModality, addSession, updateSession, deleteSession,
     cancelBooking, addSessionsBatch, deleteSessions, updateBookingStatus
   } = useStore();
   
@@ -27,6 +27,7 @@ export const AdminPanel = () => {
   const [showStudentForm, setShowStudentForm] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState(null);
   const [showModalityForm, setShowModalityForm] = useState(false);
+  const [editingModalityId, setEditingModalityId] = useState(null);
   const [showSessionForm, setShowSessionForm] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -89,9 +90,14 @@ export const AdminPanel = () => {
   const handleModalitySubmit = async (e) => {
     e.preventDefault();
     setFormLoading(true);
-    await addModality(modalityForm);
+    if (editingModalityId) {
+      await updateModality(editingModalityId, modalityForm);
+    } else {
+      await addModality(modalityForm);
+    }
     setFormLoading(false);
     setShowModalityForm(false);
+    setEditingModalityId(null);
     setModalityForm({ name: '', description: '', imageUrl: '' });
   };
 
@@ -243,7 +249,7 @@ export const AdminPanel = () => {
                 </button>
               )}
               {(activeTab === 'teachers' || activeTab === 'students' || activeTab === 'modalities') && (
-                <button onClick={() => { if (activeTab === 'teachers') setShowTeacherForm(true); if (activeTab === 'students') setShowStudentForm(true); if (activeTab === 'modalities') setShowModalityForm(true); }} className="w-full md:w-auto bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg font-bold hover:bg-indigo-700 transition-all"><Plus className="w-5 h-5" /> Novo Cadastro</button>
+                <button onClick={() => { if (activeTab === 'teachers') { setShowTeacherForm(true); setEditingTeacherId(null); setTeacherForm({ name: '', phone: '', email: '', password: 'mudar@123', modalityId: '' }); } if (activeTab === 'students') { setShowStudentForm(true); setEditingStudentId(null); setStudentForm({ name: '', phone: '', email: '', password: 'mudar@123', planType: 'Mensalista' }); } if (activeTab === 'modalities') { setShowModalityForm(true); setEditingModalityId(null); setModalityForm({ name: '', description: '', imageUrl: '' }); } }} className="w-full md:w-auto bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg font-bold hover:bg-indigo-700 transition-all"><Plus className="w-5 h-5" /> Novo Cadastro</button>
               )}
            </div>
         </header>
@@ -515,7 +521,7 @@ export const AdminPanel = () => {
             {showModalityForm && (
                 <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-xl relative animate-in slide-in-from-top-4">
                     <button onClick={() => setShowModalityForm(false)} className="absolute top-4 right-4 text-slate-400 p-1"><X /></button>
-                    <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><Dumbbell className="w-5 h-5 text-indigo-600" /> Nova Modalidade</h3>
+                    <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><Dumbbell className="w-5 h-5 text-indigo-600" /> {editingModalityId ? 'Editar Modalidade' : 'Nova Modalidade'}</h3>
                     <form onSubmit={handleModalitySubmit} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Título</label><input type="text" value={modalityForm.name} onChange={e => setModalityForm({...modalityForm, name: e.target.value})} className="w-full border-slate-200 bg-slate-50 rounded-xl p-3 text-sm font-bold" required /></div>
@@ -524,7 +530,7 @@ export const AdminPanel = () => {
                         <div className="flex justify-end pt-4 border-t border-slate-50">
                           <button type="submit" disabled={formLoading} className="bg-indigo-600 text-white px-10 py-3 rounded-xl font-black shadow-md hover:bg-indigo-700 flex items-center gap-2">
                             {formLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-5 h-5"/>}
-                            CRIAR
+                            {editingModalityId ? 'ATUALIZAR' : 'CRIAR'}
                           </button>
                         </div>
                     </form>
@@ -535,7 +541,10 @@ export const AdminPanel = () => {
                     <div key={m.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm group hover:shadow-lg transition-all">
                         <div className="h-32 relative overflow-hidden">
                           <img src={m.imageUrl} alt={m.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"/>
-                          <div className="absolute top-2 right-2"><button onClick={() => openDeleteModal('modality', m.id, 'Excluir Modalidade', `Remover modalidade ${m.name}?`)} className="bg-white/90 p-2 rounded-xl text-red-500 shadow-md hover:bg-red-500 hover:text-white transition-all"><Trash2 className="w-4 h-4" /></button></div>
+                          <div className="absolute top-2 right-2 flex gap-1">
+                            <button onClick={() => { setEditingModalityId(m.id); setModalityForm({ name: m.name, imageUrl: m.imageUrl, description: m.description || '' }); setShowModalityForm(true); }} className="bg-white/90 p-2 rounded-xl text-indigo-600 shadow-md hover:bg-indigo-600 hover:text-white transition-all"><Edit className="w-4 h-4" /></button>
+                            <button onClick={() => openDeleteModal('modality', m.id, 'Excluir Modalidade', `Remover modalidade ${m.name}?`)} className="bg-white/90 p-2 rounded-xl text-red-500 shadow-md hover:bg-red-500 hover:text-white transition-all"><Trash2 className="w-4 h-4" /></button>
+                          </div>
                         </div>
                         <div className="p-4"><h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{m.name}</h3></div>
                     </div>

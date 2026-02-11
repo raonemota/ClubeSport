@@ -221,7 +221,7 @@ export const StoreProvider = ({ children }) => {
         modality_id: data.modalityId,
         instructor: data.instructor,
         start_time: data.startTime,
-        duration_minutes: data.durationMinutes,
+        duration_minutes: data.duration_minutes,
         capacity: data.capacity,
         category: data.category
       }).eq('id', id);
@@ -374,6 +374,7 @@ export const StoreProvider = ({ children }) => {
       login, logout, addSession, updateSession, addSessionsBatch, deleteSession, deleteSessions, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, updatePassword,
       updateBookingReleaseHour: (h) => setBookingReleaseHour(parseInt(h)),
       addModality: async (d) => { if (!supabase) setModalities([...modalities, {...d, id: Date.now().toString()}]); else await supabase.from('modalities').insert([{name: d.name, description: d.description, image_url: d.imageUrl}]); fetchData(); },
+      updateModality: async (id, d) => { if (!supabase) setModalities(modalities.map(m => m.id === id ? {...m, ...d} : m)); else await supabase.from('modalities').update({name: d.name, description: d.description, image_url: d.imageUrl}).eq('id', id); fetchData(); },
       updateUser: async (id, upd) => { 
         if (!supabase) {
           setUsers(users.map(u => u.id === id ? {...u, ...upd} : u));
