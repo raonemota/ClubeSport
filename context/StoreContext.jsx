@@ -249,6 +249,7 @@ export const StoreProvider = ({ children }) => {
           const payload = {};
           if (upd.name !== undefined) payload.name = upd.name;
           if (upd.phone !== undefined) payload.phone = upd.phone;
+          if (upd.email !== undefined) payload.email = upd.email;
           if (upd.planType !== undefined) payload.plan_type = upd.planType;
           if (upd.role !== undefined) payload.role = upd.role;
           if (upd.modalityId !== undefined) payload.modality_id = upd.modalityId;
