@@ -20,6 +20,9 @@ export const StoreProvider = ({ children }) => {
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(Notification.permission === 'granted');
   const notifiedSessions = useRef(new Set());
+  
+  // REF PARA BLOQUEAR RE-FETCH DURANTE TROCA DE SENHA
+  const isUpdatingPassword = useRef(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -56,12 +59,17 @@ export const StoreProvider = ({ children }) => {
     initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // SE ESTIVERMOS NO MEIO DE UMA ATUALIZAÇÃO DE SENHA, IGNORAMOS O EVENTO DO SUPABASE
+      // PARA NÃO SOBRESCREVER O ESTADO LOCAL COM DADOS ANTIGOS
+      if (isUpdatingPassword.current) {
+          console.log("Evento Auth ignorado devido a atualização de senha em andamento.");
+          return;
+      }
+
       if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
         setLoading(false);
       } else if (session) {
-        // Apenas busca o perfil se o usuário mudou ou se ainda não temos usuário carregado
-        // Isso evita sobrescrever o estado local durante operações sensíveis como troca de senha
         if (!currentUser || currentUser.id !== session.user.id) {
             await fetchUserProfile(session.user.id);
         }
@@ -232,7 +240,7 @@ export const StoreProvider = ({ children }) => {
     return bookings.filter(b => b.sessionId === sessionId && b.status !== BookingStatus.CANCELLED_BY_STUDENT && b.status !== BookingStatus.CANCELLED_BY_ADMIN).length;
   };
 
-  // --- LÓGICA DE ATUALIZAÇÃO DE SENHA CORRIGIDA ---
+  // --- LÓGICA DE ATUALIZAÇÃO DE SENHA CORRIGIDA E BLINDADA ---
   const updatePassword = async (newPassword) => {
       console.log("Iniciando updatePassword...");
       if (!supabase) {
@@ -242,39 +250,44 @@ export const StoreProvider = ({ children }) => {
           return true;
       }
       
+      // BLOQUEAR RE-FETCH
+      isUpdatingPassword.current = true;
+
       // 1. Atualizar Auth do Supabase
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       
       if (error) {
           console.error("Erro FATAL ao atualizar senha no Auth:", error.message);
+          isUpdatingPassword.current = false;
           return false;
       }
 
       console.log("Senha Auth atualizada. Atualizando perfil...");
 
       // 2. Atualizar tabela de Profiles (DB)
-      // Fazemos isso independente do sucesso do passo 1 para garantir consistência
       const { error: profileError } = await supabase.from('profiles')
           .update({ must_change_password: false })
           .eq('id', currentUser.id);
 
       if (profileError) {
-          console.warn("Aviso: Erro ao atualizar flag no perfil (pode ser RLS), mas a senha foi trocada.", profileError.message);
+          console.warn("Aviso: Falha ao atualizar perfil no DB (Possível erro de RLS).", profileError.message);
+          // Mesmo que falhe no DB, para a sessão ATUAL, vamos considerar sucesso
       } else {
-          console.log("Perfil DB atualizado.");
+          console.log("Perfil DB atualizado com sucesso.");
       }
       
-      // 3. ATUALIZAÇÃO OTIMISTA DO ESTADO LOCAL (CRÍTICO)
-      // Forçamos o estado local imediatamente para permitir a navegação no ProtectedRoute
-      setCurrentUser(prev => {
-          const newState = { ...prev, mustChangePassword: false };
-          console.log("Estado local currentUser atualizado manualmente para:", newState);
-          return newState;
-      });
+      // 3. ATUALIZAÇÃO MANUAL E IMEDIATA DO ESTADO
+      // Forçamos o estado local para garantir que a UI desbloqueie
+      const updatedUser = { ...currentUser, mustChangePassword: false };
+      setCurrentUser(updatedUser);
+      console.log("Estado local forçado para:", updatedUser);
 
-      // 4. Forçar refresh silencioso para garantir sincronia futura
-      // Não usamos await aqui para não travar a UI
-      fetchUserProfile(currentUser.id).catch(err => console.error("Erro no refresh de fundo:", err));
+      // 4. DESBLOQUEAR APÓS TIMEOUT SEGURO
+      // Mantemos o bloqueio por alguns segundos para evitar que o listener do Auth sobrescreva nossos dados
+      setTimeout(() => {
+          isUpdatingPassword.current = false;
+          // Opcional: tentar sincronizar silenciosamente depois
+      }, 3000);
 
       return true;
   };
