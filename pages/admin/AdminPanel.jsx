@@ -4,7 +4,7 @@ import { useStore } from '../../context/StoreContext';
 import { 
   Plus, Trash2, Edit, Calendar, Dumbbell, Users, X, FileText, 
   GraduationCap, Phone, Mail, Clock, Filter, Save, Info, 
-  AlertCircle, ShieldCheck, Key, Settings, ChevronDown, ChevronUp, UserX, UserCheck
+  AlertCircle, ShieldCheck, Key, Settings, ChevronDown, ChevronUp, UserX, UserCheck, Layers
 } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { UserRole, BookingStatus } from '../../types.js';
@@ -34,6 +34,7 @@ export const AdminPanel = () => {
   const [sessionForm, setSessionForm] = useState({ modalityId: '', instructor: '', date: '', time: '', durationMinutes: 60, capacity: 10, category: '' });
 
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reportModality, setReportModality] = useState('all');
   const [expandedSessionId, setExpandedSessionId] = useState(null);
 
   // Estado para Modal de Confirmação
@@ -506,19 +507,42 @@ export const AdminPanel = () => {
         {activeTab === 'reports' && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold text-slate-800">Relatórios Gerenciais</h1>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                     <label className="text-sm font-bold text-slate-600">Data:</label>
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center gap-6">
+                <div className="flex items-center gap-3">
+                     <label className="text-sm font-bold text-slate-600 flex items-center gap-1">
+                        <Calendar className="w-4 h-4 text-indigo-500" /> Data:
+                     </label>
                      <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500" />
                 </div>
-                <div className="text-xs text-slate-400 flex items-center gap-1">
-                    <Info className="w-3 h-3" /> Clique em uma aula para ver os alunos reservados.
+
+                <div className="flex items-center gap-3">
+                     <label className="text-sm font-bold text-slate-600 flex items-center gap-1">
+                        <Layers className="w-4 h-4 text-indigo-500" /> Modalidade:
+                     </label>
+                     <select 
+                        value={reportModality} 
+                        onChange={(e) => setReportModality(e.target.value)}
+                        className="border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 bg-white min-w-[180px]"
+                     >
+                        <option value="all">Todas as Modalidades</option>
+                        {modalities.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                     </select>
+                </div>
+
+                <div className="md:ml-auto text-xs text-slate-400 flex items-center gap-1">
+                    <Info className="w-3 h-3" /> Clique em uma aula para detalhes.
                 </div>
             </div>
             
             <div className="space-y-4">
               {sessions
-                .filter(s => isSameDay(parseISO(s.startTime), parseISO(reportDate)))
+                .filter(s => {
+                    const dateMatch = isSameDay(parseISO(s.startTime), parseISO(reportDate));
+                    const modalityMatch = reportModality === 'all' || s.modalityId === reportModality;
+                    return dateMatch && modalityMatch;
+                })
                 .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
                 .map(s => {
                   const stats = getSessionStats(s.id);
@@ -610,10 +634,14 @@ export const AdminPanel = () => {
                   );
                 })}
               
-              {sessions.filter(s => isSameDay(parseISO(s.startTime), parseISO(reportDate))).length === 0 && (
+              {sessions.filter(s => {
+                  const dateMatch = isSameDay(parseISO(s.startTime), parseISO(reportDate));
+                  const modalityMatch = reportModality === 'all' || s.modalityId === reportModality;
+                  return dateMatch && modalityMatch;
+              }).length === 0 && (
                 <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-slate-200 text-slate-400">
                    <Calendar className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                   <p>Nenhuma aula programada para esta data.</p>
+                   <p>Nenhuma aula encontrada para os filtros selecionados.</p>
                 </div>
               )}
             </div>
