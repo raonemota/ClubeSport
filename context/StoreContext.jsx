@@ -24,12 +24,21 @@ export const StoreProvider = ({ children }) => {
   const isUpdatingPassword = useRef(false);
 
   useEffect(() => {
+    // Safety Timeout: Evita que o app fique preso no "Carregando" se o Supabase demorar a responder
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn("Tempo limite de inicialização excedido. Forçando encerramento do loader.");
+        setLoading(false);
+      }
+    }, 6000);
+
     if (!supabase) {
       setUsers(INITIAL_USERS);
       setModalities(INITIAL_MODALITIES);
       setSessions(INITIAL_SESSIONS);
       setBookings(INITIAL_BOOKINGS);
       setLoading(false);
+      clearTimeout(safetyTimeout);
       return;
     }
 
@@ -38,7 +47,7 @@ export const StoreProvider = ({ children }) => {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.warn("Erro ao recuperar sessão, limpando dados locais:", error.message);
+          console.warn("Erro ao recuperar sessão:", error.message);
           await supabase.auth.signOut();
           setLoading(false);
           return;
@@ -52,6 +61,8 @@ export const StoreProvider = ({ children }) => {
       } catch (err) {
         console.error("Erro inesperado na inicialização:", err);
         setLoading(false);
+      } finally {
+        clearTimeout(safetyTimeout);
       }
     };
 
@@ -74,7 +85,10 @@ export const StoreProvider = ({ children }) => {
     });
 
     fetchData();
-    return () => subscription.unsubscribe();
+    return () => {
+        subscription.unsubscribe();
+        clearTimeout(safetyTimeout);
+    };
   }, []);
 
   const fetchUserProfile = async (userId) => {
@@ -89,8 +103,11 @@ export const StoreProvider = ({ children }) => {
         }
         setCurrentUser({ ...data, planType: data.plan_type, modalityId: data.modality_id, mustChangePassword: data.must_change_password });
       }
-    } catch (error) { console.error(error); } 
-    finally { setLoading(false); }
+    } catch (error) { 
+        console.error(error); 
+    } finally { 
+        setLoading(false); 
+    }
   };
 
   const fetchData = async () => {
@@ -411,10 +428,6 @@ export const StoreProvider = ({ children }) => {
           const { error } = await supabase.from('bookings').insert([{session_id: sid, user_id: currentUser.id, status}]);
           if (error) {
               console.error("Erro Supabase ao reservar:", error);
-              // Caso o banco falhe pelo constraint, avisamos o desenvolvedor
-              if (error.code === '23514') {
-                  alert("Erro de configuração no servidor (WAITLIST não permitido). Contate o suporte.");
-              }
               throw error;
           }
           await fetchData(); 
