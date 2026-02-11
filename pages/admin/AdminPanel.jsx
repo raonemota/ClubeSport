@@ -4,7 +4,7 @@ import { useStore } from '../../context/StoreContext';
 import { 
   Plus, Trash2, Edit, Calendar, Dumbbell, Users, X, FileText, 
   GraduationCap, Phone, Mail, Clock, Filter, Save, Info, 
-  AlertCircle, ShieldCheck, Key, Settings, ChevronDown, ChevronUp, UserX, UserCheck, Layers, CheckSquare, Square, Copy, Menu, ChevronLeft, ChevronRight, Timer, LayoutDashboard, Search, Camera, ListPlus, CalendarDays
+  AlertCircle, ShieldCheck, Key, Settings, ChevronDown, ChevronUp, UserX, UserCheck, Layers, CheckSquare, Square, Copy, Menu, ChevronLeft, ChevronRight, Timer, LayoutDashboard, Search, Camera, ListPlus, CalendarDays, Loader2
 } from 'lucide-react';
 import { format, parseISO, isSameDay, addDays } from 'date-fns';
 import { UserRole, BookingStatus } from '../../types.js';
@@ -60,6 +60,40 @@ export const AdminPanel = () => {
       return dateMatch && modalityMatch;
     }).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
   }, [sessions, scheduleFilterDate, scheduleFilterModality]);
+
+  // Handlers para Professores
+  const handleTeacherSubmit = async (e) => {
+    e.preventDefault();
+    setFormLoading(true);
+    if (editingTeacherId) await updateUser(editingTeacherId, teacherForm);
+    else await registerUser(teacherForm, UserRole.TEACHER);
+    setFormLoading(false);
+    setShowTeacherForm(false);
+    setEditingTeacherId(null);
+    setTeacherForm({ name: '', phone: '', email: '', password: 'mudar@123', modalityId: '' });
+  };
+
+  // Handlers para Alunos
+  const handleStudentSubmit = async (e) => {
+    e.preventDefault();
+    setFormLoading(true);
+    if (editingStudentId) await updateUser(editingStudentId, studentForm);
+    else await registerUser(studentForm, UserRole.STUDENT);
+    setFormLoading(false);
+    setShowStudentForm(false);
+    setEditingStudentId(null);
+    setStudentForm({ name: '', phone: '', email: '', password: 'mudar@123', planType: 'Mensalista' });
+  };
+
+  // Handler para Modalidades
+  const handleModalitySubmit = async (e) => {
+    e.preventDefault();
+    setFormLoading(true);
+    await addModality(modalityForm);
+    setFormLoading(false);
+    setShowModalityForm(false);
+    setModalityForm({ name: '', description: '', imageUrl: '' });
+  };
 
   const toggleDayOfWeek = (day) => {
     const newDays = batchForm.daysOfWeek.includes(day)
@@ -139,6 +173,15 @@ export const AdminPanel = () => {
   const getSessionStats = (sessionId) => {
       const confirmed = bookings.filter(b => b.sessionId === sessionId && b.status === BookingStatus.CONFIRMED).length;
       return { total: confirmed };
+  };
+
+  const formatPhone = (value) => {
+    value = value.replace(/\D/g, "");
+    if (value.length > 11) value = value.slice(0, 11);
+    if (value.length === 11) return value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+    if (value.length > 6) return value.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
+    if (value.length > 2) return value.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
+    return value;
   };
 
   const daysLabels = [
@@ -410,7 +453,12 @@ export const AdminPanel = () => {
                         <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Modalidade Principal</label><select value={teacherForm.modalityId} onChange={e => setTeacherForm({...teacherForm, modalityId: e.target.value})} className="w-full border-slate-200 bg-slate-50 rounded-xl p-3 text-sm font-bold" required><option value="">Selecione...</option>{modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
                         <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp</label><input type="text" value={teacherForm.phone} onChange={e => setTeacherForm({...teacherForm, phone: formatPhone(e.target.value)})} className="w-full border-slate-200 bg-slate-50 rounded-xl p-3 text-sm font-bold" required /></div>
                         <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email (Login)</label><input type="email" value={teacherForm.email} onChange={e => setTeacherForm({...teacherForm, email: e.target.value})} className="w-full border-slate-200 bg-slate-50 rounded-xl p-3 text-sm font-bold" required /></div>
-                        <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-slate-50"><button type="submit" className="bg-indigo-600 text-white px-10 py-3 rounded-xl font-black shadow-md hover:bg-indigo-700">SALVAR</button></div>
+                        <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-slate-50">
+                          <button type="submit" disabled={formLoading} className="bg-indigo-600 text-white px-10 py-3 rounded-xl font-black shadow-md hover:bg-indigo-700 flex items-center gap-2">
+                            {formLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-5 h-5"/>}
+                            SALVAR
+                          </button>
+                        </div>
                     </form>
                 </div>
             )}
@@ -423,6 +471,75 @@ export const AdminPanel = () => {
                         ))}
                     </tbody>
                 </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: ALUNOS */}
+        {activeTab === 'students' && (
+          <div className="space-y-6">
+             {showStudentForm && (
+                <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-xl relative animate-in slide-in-from-top-4">
+                    <button onClick={() => setShowStudentForm(false)} className="absolute top-4 right-4 text-slate-400 p-1"><X /></button>
+                    <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-indigo-600" /> {editingStudentId ? 'Editar Aluno' : 'Novo Aluno'}</h3>
+                    <form onSubmit={handleStudentSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome</label><input type="text" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} className="w-full border-slate-200 bg-slate-50 rounded-xl p-3 text-sm font-bold" required /></div>
+                        <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email (Login)</label><input type="email" value={studentForm.email} onChange={e => setStudentForm({...studentForm, email: e.target.value})} className="w-full border-slate-200 bg-slate-50 rounded-xl p-3 text-sm font-bold" required /></div>
+                        <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp</label><input type="text" value={studentForm.phone} onChange={e => setStudentForm({...studentForm, phone: formatPhone(e.target.value)})} className="w-full border-slate-200 bg-slate-50 rounded-xl p-3 text-sm font-bold" required /></div>
+                        <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Plano</label><select value={studentForm.planType} onChange={e => setStudentForm({...studentForm, planType: e.target.value})} className="w-full border-slate-200 bg-slate-50 rounded-xl p-3 text-sm font-bold"><option value="Mensalista">Mensalista</option><option value="Totalpass">Totalpass</option><option value="Wellhub">Wellhub</option></select></div>
+                        <div className="md:col-span-2 flex justify-end pt-4 border-t border-slate-50">
+                          <button type="submit" disabled={formLoading} className="bg-indigo-600 text-white px-10 py-3 rounded-xl font-black shadow-md hover:bg-indigo-700 flex items-center gap-2">
+                            {formLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-5 h-5"/>}
+                            {editingStudentId ? 'ATUALIZAR' : 'CADASTRAR'}
+                          </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <table className="min-w-full divide-y divide-slate-100">
+                    <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest"><tr><th className="px-6 py-4 text-left">Aluno</th><th className="px-6 py-4 text-center">Plano</th><th className="px-6 py-4 text-right">Ações</th></tr></thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {students.map(s => (
+                            <tr key={s.id} className="hover:bg-slate-50"><td className="px-6 py-4 font-black text-slate-800 text-sm">{s.name}</td><td className="px-6 py-4 text-center text-[10px] font-black uppercase text-slate-500 tracking-widest">{s.planType}</td><td className="px-6 py-4 text-right flex justify-end gap-2"><button onClick={() => { setEditingStudentId(s.id); setStudentForm(s); setShowStudentForm(true); }} className="p-2 text-slate-300 hover:text-indigo-600"><Edit className="w-4 h-4" /></button><button onClick={() => openDeleteModal('user', s.id, 'Excluir Aluno', `Remover aluno ${s.name}?`)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button></td></tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: MODALIDADES */}
+        {activeTab === 'modalities' && (
+          <div className="space-y-6">
+            {showModalityForm && (
+                <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-xl relative animate-in slide-in-from-top-4">
+                    <button onClick={() => setShowModalityForm(false)} className="absolute top-4 right-4 text-slate-400 p-1"><X /></button>
+                    <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><Dumbbell className="w-5 h-5 text-indigo-600" /> Nova Modalidade</h3>
+                    <form onSubmit={handleModalitySubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Título</label><input type="text" value={modalityForm.name} onChange={e => setModalityForm({...modalityForm, name: e.target.value})} className="w-full border-slate-200 bg-slate-50 rounded-xl p-3 text-sm font-bold" required /></div>
+                            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Link da Imagem</label><input type="text" value={modalityForm.imageUrl} onChange={e => setModalityForm({...modalityForm, imageUrl: e.target.value})} className="w-full border-slate-200 bg-slate-50 rounded-xl p-3 text-sm font-bold" required /></div>
+                        </div>
+                        <div className="flex justify-end pt-4 border-t border-slate-50">
+                          <button type="submit" disabled={formLoading} className="bg-indigo-600 text-white px-10 py-3 rounded-xl font-black shadow-md hover:bg-indigo-700 flex items-center gap-2">
+                            {formLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-5 h-5"/>}
+                            CRIAR
+                          </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {modalities.map(m => (
+                    <div key={m.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm group hover:shadow-lg transition-all">
+                        <div className="h-32 relative overflow-hidden">
+                          <img src={m.imageUrl} alt={m.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"/>
+                          <div className="absolute top-2 right-2"><button onClick={() => openDeleteModal('modality', m.id, 'Excluir Modalidade', `Remover modalidade ${m.name}?`)} className="bg-white/90 p-2 rounded-xl text-red-500 shadow-md hover:bg-red-500 hover:text-white transition-all"><Trash2 className="w-4 h-4" /></button></div>
+                        </div>
+                        <div className="p-4"><h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{m.name}</h3></div>
+                    </div>
+                ))}
             </div>
           </div>
         )}
@@ -488,7 +605,22 @@ export const AdminPanel = () => {
           </div>
         )}
 
-        {/* ... Resto das abas mantido ... */}
+        {/* TAB: AJUSTES */}
+        {activeTab === 'settings' && (
+          <div className="max-w-xl space-y-6">
+             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center gap-3"><Settings className="w-5 h-5 text-indigo-600" /><h3 className="font-black text-slate-800 uppercase tracking-widest text-sm">Regras do Sistema</h3></div>
+                <div className="p-6 space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Horário de Liberação de Vagas (Amanhã)</label>
+                      <select value={bookingReleaseHour} onChange={(e) => updateBookingReleaseHour(e.target.value)} className="w-full bg-slate-50 border-slate-200 rounded-xl px-4 py-3 font-black text-indigo-600">
+                          {Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{i.toString().padStart(2, '0')}:00</option>)}
+                      </select>
+                    </div>
+                </div>
+             </div>
+          </div>
+        )}
       </main>
     </div>
   );
