@@ -29,22 +29,22 @@ export const TeacherPortal = () => {
   }).format(viewDate);
 
   return (
-    <div className="max-w-6xl mx-auto py-6 px-4">
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="max-w-7xl mx-auto py-10 px-6">
+      <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Painel de Chamadas</h1>
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Gerencie a frequência dos seus alunos</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-2">Painel de Chamadas</h1>
+          <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">Controle de frequência e presença</p>
         </div>
-        <div className="bg-white p-1.5 rounded-xl border border-slate-200 flex items-center justify-between sm:justify-start gap-2 shadow-sm">
-           <button onClick={() => setViewDate(addDays(viewDate, -1))} className="p-1.5 hover:bg-slate-50 rounded-lg"><ChevronLeft className="w-5 h-5" /></button>
-           <span className="font-black text-slate-700 text-xs uppercase tracking-tighter min-w-[120px] text-center">{formattedHeaderDate}</span>
-           <button onClick={() => setViewDate(addDays(viewDate, 1))} className="p-1.5 hover:bg-slate-50 rounded-lg"><ChevronRight className="w-5 h-5" /></button>
+        <div className="bg-white p-2 rounded-2xl border border-slate-200 flex items-center justify-between sm:justify-start gap-4 shadow-md">
+           <button onClick={() => setViewDate(addDays(viewDate, -1))} className="p-2 hover:bg-slate-50 rounded-xl transition-colors"><ChevronLeft className="w-6 h-6 text-slate-400" /></button>
+           <span className="font-black text-slate-800 text-sm uppercase tracking-widest min-w-[160px] text-center">{formattedHeaderDate}</span>
+           <button onClick={() => setViewDate(addDays(viewDate, 1))} className="p-2 hover:bg-slate-50 rounded-xl transition-colors"><ChevronRight className="w-6 h-6 text-slate-400" /></button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-4 space-y-3">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Minhas Aulas</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="lg:col-span-4 space-y-4">
+          <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest px-2">Minhas Aulas de Hoje</h3>
           {mySessions.map(session => {
             const modality = modalities.find(m => m.id === session.modalityId);
             const count = bookings.filter(b => b.sessionId === session.id && b.status !== BookingStatus.CANCELLED).length;
@@ -53,35 +53,35 @@ export const TeacherPortal = () => {
               <button
                 key={session.id}
                 onClick={() => setSelectedSessionId(session.id)}
-                className={`w-full text-left p-3 rounded-xl border transition-all ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-400'}`}
+                className={`w-full text-left p-5 rounded-2xl border transition-all duration-300 transform hover:-translate-y-1 ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl scale-[1.02]' : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:shadow-lg'}`}
               >
-                <div className="flex justify-between items-start mb-1">
-                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${isSelected ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{modality?.name}</span>
-                  <span className="text-[11px] font-black">{format(parseISO(session.startTime), 'HH:mm')}</span>
+                <div className="flex justify-between items-start mb-2">
+                  <span className={`text-[11px] font-black px-3 py-1 rounded-lg uppercase tracking-tight ${isSelected ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{modality?.name}</span>
+                  <span className="text-base font-black">{format(parseISO(session.startTime), 'HH:mm')}</span>
                 </div>
-                <p className="font-black text-sm uppercase truncate">{session.category || 'Aula Geral'}</p>
-                <p className={`text-[10px] font-bold ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>{count} Inscritos</p>
+                <p className="font-black text-lg uppercase truncate leading-tight mb-1">{session.category || 'Aula Geral'}</p>
+                <p className={`text-xs font-bold ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>{count} Alunos Inscritos</p>
               </button>
             );
           })}
           {mySessions.length === 0 && (
-            <div className="bg-white p-10 rounded-xl border border-dashed border-slate-200 text-center">
-              <p className="text-slate-300 text-[10px] font-black uppercase">Nenhuma aula hoje</p>
+            <div className="bg-white p-16 rounded-2xl border-2 border-dashed border-slate-200 text-center shadow-inner">
+              <p className="text-slate-300 text-xs font-black uppercase tracking-widest">Nenhuma aula para exibir</p>
             </div>
           )}
         </div>
 
         <div className="lg:col-span-8">
           {selectedSessionId ? (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500">
+              <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                 <div>
-                  <h3 className="font-black text-slate-800 text-base uppercase">Chamada da Turma</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{format(parseISO(currentSession.startTime), 'HH:mm')} - {currentSession.category}</p>
+                  <h3 className="font-black text-slate-900 text-xl uppercase tracking-tight">Lista de Presença</h3>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">{format(parseISO(currentSession.startTime), 'HH:mm')} • {currentSession.category || 'Geral'}</p>
                 </div>
-                <div className="bg-white border border-slate-200 px-3 py-1 rounded-lg">
-                   <p className="text-xl font-black text-indigo-600 leading-none">{sessionBookings.length}</p>
-                   <p className="text-[8px] uppercase font-black text-slate-400">Total</p>
+                <div className="bg-white border border-slate-200 px-5 py-2 rounded-2xl shadow-sm text-center">
+                   <p className="text-3xl font-black text-indigo-600 leading-none">{sessionBookings.length}</p>
+                   <p className="text-[10px] uppercase font-black text-slate-400 mt-1 tracking-widest">Total</p>
                 </div>
               </div>
               <div className="divide-y divide-slate-100">
@@ -91,46 +91,47 @@ export const TeacherPortal = () => {
                     const isAttended = booking.status === BookingStatus.ATTENDED;
                     const isMissed = booking.status === BookingStatus.MISSED;
                     return (
-                      <div key={booking.id} className={`p-3 flex items-center justify-between ${isMissed ? 'bg-red-50/20' : ''}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white font-black text-xs ${isAttended ? 'bg-green-500' : isMissed ? 'bg-red-500' : 'bg-slate-300'}`}>
+                      <div key={booking.id} className={`p-5 flex items-center justify-between transition-colors ${isMissed ? 'bg-red-50/20' : isAttended ? 'bg-green-50/10' : 'hover:bg-slate-50'}`}>
+                        <div className="flex items-center gap-5">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-base shadow-lg ${isAttended ? 'bg-green-500' : isMissed ? 'bg-red-500' : 'bg-slate-300'}`}>
                             {student?.name.charAt(0)}
                           </div>
                           <div>
-                            <p className={`text-sm font-black ${isMissed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{student?.name}</p>
-                            <p className="text-[9px] text-slate-400 uppercase font-black tracking-tight">{student?.planType}</p>
+                            <p className={`text-base font-black uppercase tracking-tight ${isMissed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{student?.name}</p>
+                            <p className="text-xs text-slate-400 uppercase font-black tracking-widest mt-1">{student?.planType}</p>
                           </div>
                         </div>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-3">
                           <button
                             onClick={() => handleAttendance(booking.id, BookingStatus.ATTENDED)}
-                            className={`p-2 rounded-lg transition-all ${isAttended ? 'bg-green-100 text-green-600' : 'bg-slate-50 text-slate-300 hover:text-green-500'}`}
+                            className={`p-3 rounded-xl transition-all shadow-sm active:scale-90 ${isAttended ? 'bg-green-500 text-white shadow-green-200' : 'bg-slate-50 text-slate-300 hover:text-green-500 hover:bg-green-50'}`}
                             title="Presente"
                           >
-                            <CheckCircle2 className="w-5 h-5" />
+                            <CheckCircle2 className="w-7 h-7" />
                           </button>
                           <button
                             onClick={() => handleAttendance(booking.id, BookingStatus.MISSED)}
-                            className={`p-2 rounded-lg transition-all ${isMissed ? 'bg-red-100 text-red-600' : 'bg-slate-50 text-slate-300 hover:text-red-500'}`}
+                            className={`p-3 rounded-xl transition-all shadow-sm active:scale-90 ${isMissed ? 'bg-red-500 text-white shadow-red-200' : 'bg-slate-50 text-slate-300 hover:text-red-500 hover:bg-red-50'}`}
                             title="Faltou"
                           >
-                            <XCircle className="w-5 h-5" />
+                            <XCircle className="w-7 h-7" />
                           </button>
                         </div>
                       </div>
                     );
                   })
                 ) : (
-                  <div className="p-16 text-center text-slate-200">
-                    <p className="font-black text-xs uppercase">Sem alunos para esta aula</p>
+                  <div className="p-24 text-center">
+                    <ClipboardList className="w-16 h-16 mx-auto mb-4 text-slate-100" />
+                    <p className="font-black text-sm uppercase text-slate-300 tracking-widest">Nenhum aluno registrado</p>
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="h-full bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center p-12 text-slate-300">
-               <ClipboardList className="w-12 h-12 mb-2 opacity-20" />
-               <p className="font-black text-[10px] uppercase tracking-widest">Selecione uma aula para iniciar a chamada</p>
+            <div className="h-full bg-slate-100 rounded-3xl border-4 border-dashed border-slate-200 flex flex-col items-center justify-center p-20 text-slate-400">
+               <ClipboardList className="w-20 h-20 mb-4 opacity-10" />
+               <p className="font-black text-xs uppercase tracking-widest text-center leading-relaxed">Selecione uma aula no menu lateral<br/>para iniciar a chamada da turma</p>
             </div>
           )}
         </div>

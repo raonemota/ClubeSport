@@ -41,8 +41,8 @@ const AppContent = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-          <p className="text-slate-500 text-sm font-medium">Carregando...</p>
+          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+          <p className="text-slate-600 text-base font-bold uppercase tracking-widest">Carregando...</p>
         </div>
       </div>
     );
@@ -63,7 +63,7 @@ const AppContent = () => {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
-        <footer className="bg-slate-900 text-slate-500 py-6 text-center text-xs">
+        <footer className="bg-slate-900 text-slate-500 py-8 text-center text-sm font-medium">
           &copy; {new Date().getFullYear()} ClubeSport. Gestão Esportiva Inteligente.
         </footer>
       </div>
