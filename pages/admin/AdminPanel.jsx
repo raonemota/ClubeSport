@@ -1,21 +1,23 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { Plus, Trash2, Calendar, Dumbbell, Users, X, FileText, GraduationCap, Phone, Mail, Clock, Filter, Save, Info, AlertCircle, ShieldCheck, Key } from 'lucide-react';
+import { Plus, Trash2, Calendar, Dumbbell, Users, X, FileText, GraduationCap, Phone, Mail, Clock, Filter, Save, Info, AlertCircle, ShieldCheck, Key, Settings } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { UserRole, BookingStatus } from '../../types.js';
 
 export const AdminPanel = () => {
-  const { modalities, sessions, users, bookings, registerUser, deleteUser, getStudentStats, addModality, deleteModality, addSession, deleteSession } = useStore();
+  const { 
+    modalities, sessions, users, bookings, bookingReleaseHour, updateBookingReleaseHour,
+    registerUser, deleteUser, getStudentStats, addModality, deleteModality, addSession, deleteSession 
+  } = useStore();
+  
   const [activeTab, setActiveTab] = useState('reports');
   
   // States para Formulários
   const [showTeacherForm, setShowTeacherForm] = useState(false);
   const [showStudentForm, setShowStudentForm] = useState(false);
-  
   const [teacherForm, setTeacherForm] = useState({ name: '', phone: '', email: '', password: 'mudar@123' });
   const [studentForm, setStudentForm] = useState({ name: '', phone: '', email: '', password: 'mudar@123', planType: 'Mensalista' });
-  
   const [formLoading, setFormLoading] = useState(false);
   
   const [showModalityForm, setShowModalityForm] = useState(false);
@@ -45,11 +47,9 @@ export const AdminPanel = () => {
     setFormLoading(true);
     const result = await registerUser(teacherForm, UserRole.TEACHER);
     if (result.success) {
-      alert(`Professor cadastrado com sucesso!\n\nLogin: ${teacherForm.email}\nSenha: ${teacherForm.password}`);
+      alert(`Professor cadastrado com sucesso!`);
       setTeacherForm({ name: '', phone: '', email: '', password: 'mudar@123' });
       setShowTeacherForm(false);
-    } else {
-      alert("Erro ao cadastrar professor: " + result.error);
     }
     setFormLoading(false);
   };
@@ -59,11 +59,9 @@ export const AdminPanel = () => {
     setFormLoading(true);
     const result = await registerUser(studentForm, UserRole.STUDENT);
     if (result.success) {
-      alert(`Aluno cadastrado com sucesso!\n\nLogin: ${studentForm.email}\nSenha: ${studentForm.password}`);
+      alert(`Aluno cadastrado com sucesso!`);
       setStudentForm({ name: '', phone: '', email: '', password: 'mudar@123', planType: 'Mensalista' });
       setShowStudentForm(false);
-    } else {
-      alert("Erro ao cadastrar aluno: " + result.error);
     }
     setFormLoading(false);
   };
@@ -85,10 +83,7 @@ export const AdminPanel = () => {
 
   const getSessionStats = (sessionId) => {
       const sessionBookings = bookings.filter(b => b.sessionId === sessionId && b.status !== BookingStatus.CANCELLED_BY_STUDENT && b.status !== BookingStatus.CANCELLED_BY_ADMIN);
-      const attended = sessionBookings.filter(b => b.status === BookingStatus.ATTENDED).length;
-      const missed = sessionBookings.filter(b => b.status === BookingStatus.MISSED).length;
-      const confirmed = sessionBookings.filter(b => b.status === BookingStatus.CONFIRMED).length;
-      return { total: sessionBookings.length, attended, missed, confirmed };
+      return { total: sessionBookings.length, attended: sessionBookings.filter(b => b.status === BookingStatus.ATTENDED).length };
   };
 
   const NavButton = ({ tabId, icon: Icon, label }) => (
@@ -110,10 +105,48 @@ export const AdminPanel = () => {
         <NavButton tabId="students" icon={Users} label="Alunos" />
         <NavButton tabId="modalities" icon={Dumbbell} label="Modalidades" />
         <NavButton tabId="schedule" icon={Calendar} label="Grade Horária" />
+        <NavButton tabId="settings" icon={Settings} label="Configurações" />
       </aside>
 
       <main className="flex-1 p-8">
-        {/* --- ABA MODALIDADES --- */}
+        {activeTab === 'settings' && (
+          <div className="max-w-2xl space-y-6">
+             <h1 className="text-2xl font-bold text-slate-800">Configurações do Sistema</h1>
+             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-slate-50 p-4 border-b flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-indigo-600" />
+                    <h3 className="font-bold text-slate-700">Regras de Agendamento</h3>
+                </div>
+                <div className="p-6 space-y-6">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Hora de Liberação (Amanhã)</label>
+                        <p className="text-xs text-slate-500 mb-4">Define a partir de qual hora as aulas do dia seguinte ficarão disponíveis para reserva pelos alunos.</p>
+                        <div className="flex items-center gap-4">
+                            <select 
+                                value={bookingReleaseHour} 
+                                onChange={(e) => updateBookingReleaseHour(e.target.value)}
+                                className="border rounded-lg p-2 font-bold text-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                            >
+                                {Array.from({ length: 24 }).map((_, i) => (
+                                    <option key={i} value={i}>{i.toString().padStart(2, '0')}:00</option>
+                                ))}
+                            </select>
+                            <span className="text-sm font-medium text-slate-400">Atualmente em: {bookingReleaseHour.toString().padStart(2, '0')}:00</span>
+                        </div>
+                    </div>
+
+                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 flex gap-3">
+                        <Info className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                        <div className="text-xs text-indigo-800 leading-relaxed">
+                            <p className="font-bold mb-1">Como funciona esta regra?</p>
+                            <p>As aulas marcadas para <strong>Hoje</strong> estão sempre liberadas. As aulas de <strong>Amanhã</strong> aparecem bloqueadas no portal do aluno até que o relógio atinja a hora definida acima.</p>
+                        </div>
+                    </div>
+                </div>
+             </div>
+          </div>
+        )}
+
         {activeTab === 'modalities' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -122,56 +155,35 @@ export const AdminPanel = () => {
                 <Plus className="w-4 h-4" /> Nova Modalidade
               </button>
             </div>
-
             {showModalityForm && (
-              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
+              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2">
                 <form onSubmit={handleModalitySubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome da Modalidade</label>
-                       <input type="text" value={modalityForm.name} onChange={e => setModalityForm({...modalityForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Natação" required />
-                    </div>
-                    <div className="space-y-1">
-                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">URL da Imagem</label>
-                       <input type="text" value={modalityForm.imageUrl} onChange={e => setModalityForm({...modalityForm, imageUrl: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://..." />
-                    </div>
+                    <input type="text" value={modalityForm.name} onChange={e => setModalityForm({...modalityForm, name: e.target.value})} className="w-full border rounded-lg p-2" placeholder="Nome" required />
+                    <input type="text" value={modalityForm.imageUrl} onChange={e => setModalityForm({...modalityForm, imageUrl: e.target.value})} className="w-full border rounded-lg p-2" placeholder="URL Imagem" />
                   </div>
-                  <div className="space-y-1">
-                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição</label>
-                     <textarea value={modalityForm.description} onChange={e => setModalityForm({...modalityForm, description: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" rows="2" placeholder="Breve descrição..." />
-                  </div>
+                  <textarea value={modalityForm.description} onChange={e => setModalityForm({...modalityForm, description: e.target.value})} className="w-full border rounded-lg p-2" rows="2" placeholder="Descrição" />
                   <div className="flex justify-end gap-2">
-                    <button type="button" onClick={() => setShowModalityForm(false)} className="bg-slate-100 text-slate-500 px-4 py-2 rounded-lg">Cancelar</button>
-                    <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700">Salvar</button>
+                    <button type="button" onClick={() => setShowModalityForm(false)} className="bg-slate-100 px-4 py-2 rounded-lg">Cancelar</button>
+                    <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold">Salvar</button>
                   </div>
                 </form>
               </div>
             )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {modalities.map(modality => (
-                <div key={modality.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col group">
-                  <div className="h-32 bg-slate-200 relative overflow-hidden">
-                    {modality.imageUrl ? (
-                      <img src={modality.imageUrl} alt={modality.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-slate-400"><Dumbbell className="w-8 h-8" /></div>
-                    )}
-                    <button onClick={() => deleteModality(modality.id)} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full text-red-500 hover:text-red-700 hover:bg-white transition-all shadow-sm opacity-0 group-hover:opacity-100">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                <div key={modality.id} className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col group">
+                  <div className="h-32 bg-slate-200 relative">
+                    {modality.imageUrl && <img src={modality.imageUrl} className="w-full h-full object-cover" />}
+                    <button onClick={() => deleteModality(modality.id)} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
                   </div>
-                  <div className="p-4 flex-grow">
-                    <h3 className="font-bold text-lg text-slate-800 mb-1">{modality.name}</h3>
-                    <p className="text-sm text-slate-500 line-clamp-3">{modality.description}</p>
-                  </div>
+                  <div className="p-4"><h3 className="font-bold">{modality.name}</h3></div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* --- ABA GRADE HORÁRIA --- */}
         {activeTab === 'schedule' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -180,84 +192,52 @@ export const AdminPanel = () => {
                 <Plus className="w-4 h-4" /> Nova Aula
               </button>
             </div>
-
             {showSessionForm && (
-              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
+              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2">
                  <form onSubmit={handleSessionSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Modalidade</label>
-                      <select value={sessionForm.modalityId} onChange={e => setSessionForm({...sessionForm, modalityId: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 bg-white" required>
-                        <option value="">Selecione...</option>
+                    <select value={sessionForm.modalityId} onChange={e => setSessionForm({...sessionForm, modalityId: e.target.value})} className="border rounded-lg p-2" required>
+                        <option value="">Modalidade...</option>
                         {modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Data</label>
-                      <input type="date" value={sessionForm.date} onChange={e => setSessionForm({...sessionForm, date: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hora</label>
-                      <input type="time" value={sessionForm.time} onChange={e => setSessionForm({...sessionForm, time: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                    </div>
+                    </select>
+                    <input type="date" value={sessionForm.date} onChange={e => setSessionForm({...sessionForm, date: e.target.value})} className="border rounded-lg p-2" required />
+                    <input type="time" value={sessionForm.time} onChange={e => setSessionForm({...sessionForm, time: e.target.value})} className="border rounded-lg p-2" required />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                     <div className="space-y-1 md:col-span-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Instrutor</label>
-                        <input type="text" value={sessionForm.instructor} onChange={e => setSessionForm({...sessionForm, instructor: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Nome do Professor" required />
-                     </div>
-                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Capacidade</label>
-                        <input type="number" value={sessionForm.capacity} onChange={e => setSessionForm({...sessionForm, capacity: parseInt(e.target.value)})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" min="1" required />
-                     </div>
-                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
-                        <input type="text" value={sessionForm.category} onChange={e => setSessionForm({...sessionForm, category: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Iniciante" />
-                     </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input type="text" value={sessionForm.instructor} onChange={e => setSessionForm({...sessionForm, instructor: e.target.value})} className="border rounded-lg p-2" placeholder="Instrutor" required />
+                    <input type="number" value={sessionForm.capacity} onChange={e => setSessionForm({...sessionForm, capacity: parseInt(e.target.value)})} className="border rounded-lg p-2" placeholder="Capacidade" required />
+                    <input type="text" value={sessionForm.category} onChange={e => setSessionForm({...sessionForm, category: e.target.value})} className="border rounded-lg p-2" placeholder="Categoria" />
                   </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <button type="button" onClick={() => setShowSessionForm(false)} className="bg-slate-100 text-slate-500 px-4 py-2 rounded-lg">Cancelar</button>
-                    <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700">Adicionar Aula</button>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setShowSessionForm(false)} className="bg-slate-100 px-4 py-2 rounded-lg">Cancelar</button>
+                    <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold">Adicionar</button>
                   </div>
                  </form>
               </div>
             )}
-
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50 font-bold text-slate-500">
                   <tr>
-                    <th className="px-6 py-4 text-left">Data / Hora</th>
-                    <th className="px-6 py-4 text-left">Modalidade</th>
-                    <th className="px-6 py-4 text-left">Instrutor / Categoria</th>
-                    <th className="px-6 py-4 text-center">Vagas</th>
-                    <th className="px-6 py-4 text-right">Ações</th>
+                    <th className="px-6 py-4 text-left text-xs uppercase">Data/Hora</th>
+                    <th className="px-6 py-4 text-left text-xs uppercase">Modalidade</th>
+                    <th className="px-6 py-4 text-left text-xs uppercase">Instrutor</th>
+                    <th className="px-6 py-4 text-center text-xs uppercase">Vagas</th>
+                    <th className="px-6 py-4 text-right text-xs uppercase">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {sessions
-                    .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-                    .map(session => {
-                      const modality = modalities.find(m => m.id === session.modalityId);
-                      return (
-                        <tr key={session.id} className="hover:bg-slate-50">
-                          <td className="px-6 py-4">
-                             <div className="font-bold text-slate-800">{format(parseISO(session.startTime), 'dd/MM/yyyy')}</div>
-                             <div className="text-xs text-slate-500 font-medium">{format(parseISO(session.startTime), 'HH:mm')}</div>
-                          </td>
-                          <td className="px-6 py-4 font-medium text-slate-700">{modality?.name}</td>
-                          <td className="px-6 py-4">
-                             <div className="text-slate-900">{session.instructor}</div>
-                             {session.category && <span className="text-[10px] uppercase bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-500">{session.category}</span>}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                             <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded text-xs">{session.capacity}</span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                             <button onClick={() => deleteSession(session.id)} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                          </td>
-                        </tr>
-                      );
+                  {sessions.sort((a,b) => new Date(a.startTime) - new Date(b.startTime)).map(s => {
+                    const m = modalities.find(mod => mod.id === s.modalityId);
+                    return (
+                      <tr key={s.id} className="hover:bg-slate-50 text-sm">
+                        <td className="px-6 py-4 font-bold">{format(parseISO(s.startTime), 'dd/MM HH:mm')}</td>
+                        <td className="px-6 py-4">{m?.name}</td>
+                        <td className="px-6 py-4">{s.instructor}</td>
+                        <td className="px-6 py-4 text-center font-bold text-indigo-600">{s.capacity}</td>
+                        <td className="px-6 py-4 text-right"><button onClick={() => deleteSession(s.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></td>
+                      </tr>
+                    );
                   })}
                 </tbody>
               </table>
@@ -265,257 +245,113 @@ export const AdminPanel = () => {
           </div>
         )}
 
-        {/* --- ABA PROFESSORES --- */}
         {activeTab === 'teachers' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h1 className="text-2xl font-bold text-slate-800">Gestão de Professores</h1>
-              <button onClick={() => setShowTeacherForm(!showTeacherForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-sm">
-                <Plus className="w-4 h-4" /> Novo Professor
-              </button>
+              <h1 className="text-2xl font-bold text-slate-800">Professores</h1>
+              <button onClick={() => setShowTeacherForm(!showTeacherForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm"><Plus className="w-4 h-4" /> Novo</button>
             </div>
-
             {showTeacherForm && (
-              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
-                <form onSubmit={handleTeacherSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome Completo</label>
-                    <input type="text" value={teacherForm.name} onChange={e => setTeacherForm({...teacherForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">E-mail</label>
-                    <input type="email" value={teacherForm.email} onChange={e => setTeacherForm({...teacherForm, email: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Telefone</label>
-                    <input type="text" value={teacherForm.phone} onChange={e => setTeacherForm({...teacherForm, phone: formatPhone(e.target.value)})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="(00) 00000-0000" required />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Senha Inicial</label>
-                    <div className="relative">
-                      <Key className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
-                      <input type="text" value={teacherForm.password} onChange={e => setTeacherForm({...teacherForm, password: e.target.value})} className="w-full border rounded-lg pl-8 p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                    </div>
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <button 
-                        type="submit" 
-                        disabled={formLoading}
-                        className="bg-indigo-600 text-white h-10 px-6 rounded-lg font-bold text-sm hover:bg-indigo-700 w-full transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                        {formLoading ? '...' : <Save className="w-4 h-4" />} Salvar
-                    </button>
-                    <button type="button" onClick={() => setShowTeacherForm(false)} className="bg-slate-100 text-slate-500 h-10 px-4 rounded-lg"><X className="w-4 h-4" /></button>
+              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2">
+                <form onSubmit={handleTeacherSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <input type="text" value={teacherForm.name} onChange={e => setTeacherForm({...teacherForm, name: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="Nome" required />
+                  <input type="email" value={teacherForm.email} onChange={e => setTeacherForm({...teacherForm, email: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="E-mail" required />
+                  <input type="text" value={teacherForm.phone} onChange={e => setTeacherForm({...teacherForm, phone: formatPhone(e.target.value)})} className="border rounded-lg p-2 text-sm" placeholder="Telefone" required />
+                  <input type="text" value={teacherForm.password} onChange={e => setTeacherForm({...teacherForm, password: e.target.value})} className="border rounded-lg p-2 text-sm font-mono" required />
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={formLoading} className="bg-indigo-600 text-white px-4 rounded-lg text-sm font-bold flex-1">{formLoading ? '...' : 'Salvar'}</button>
+                    <button type="button" onClick={() => setShowTeacherForm(false)} className="bg-slate-100 px-2 rounded-lg"><X className="w-4 h-4" /></button>
                   </div>
                 </form>
               </div>
             )}
-
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 font-bold text-slate-500">
-                  <tr>
-                    <th className="px-6 py-4 text-left">Professor</th>
-                    <th className="px-6 py-4 text-left">Contato</th>
-                    <th className="px-6 py-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {teachers.map(t => (
-                    <tr key={t.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4 font-medium text-slate-900">{t.name}</td>
-                      <td className="px-6 py-4 text-slate-500">
-                        <div className="flex flex-col">
-                          <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {t.phone}</span>
-                          <span className="flex items-center gap-1 text-xs"><Mail className="w-3 h-3" /> {t.email}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button onClick={() => deleteUser(t.id)} className="text-red-400 hover:text-red-600 p-1"><Trash2 className="w-4 h-4" /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50 font-bold text-slate-500 text-xs">
+                        <tr><th className="px-6 py-4 text-left">Nome</th><th className="px-6 py-4 text-left">Contato</th><th className="px-6 py-4 text-right">Ações</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                        {teachers.map(t => (
+                            <tr key={t.id} className="hover:bg-slate-50 text-sm">
+                                <td className="px-6 py-4 font-medium">{t.name}</td>
+                                <td className="px-6 py-4 text-slate-500">{t.email} | {t.phone}</td>
+                                <td className="px-6 py-4 text-right"><button onClick={() => deleteUser(t.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
           </div>
         )}
 
-        {/* --- ABA ALUNOS --- */}
         {activeTab === 'students' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h1 className="text-2xl font-bold text-slate-800">Gestão de Alunos</h1>
-              <button onClick={() => setShowStudentForm(!showStudentForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-sm transition-all">
-                <Plus className="w-4 h-4" /> Novo Aluno
-              </button>
+              <h1 className="text-2xl font-bold text-slate-800">Alunos</h1>
+              <button onClick={() => setShowStudentForm(!showStudentForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm"><Plus className="w-4 h-4" /> Novo</button>
             </div>
-
             {showStudentForm && (
-              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
-                <form onSubmit={handleStudentSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome Completo</label>
-                    <input type="text" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">E-mail</label>
-                    <input type="email" value={studentForm.email} onChange={e => setStudentForm({...studentForm, email: e.target.value})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Telefone</label>
-                    <input type="text" value={studentForm.phone} onChange={e => setStudentForm({...studentForm, phone: formatPhone(e.target.value)})} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="(00) 00000-0000" required />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Senha Inicial</label>
-                    <div className="relative">
-                      <Key className="absolute left-2 top-2.5 w-4 h-4 text-slate-400" />
-                      <input type="text" value={studentForm.password} onChange={e => setStudentForm({...studentForm, password: e.target.value})} className="w-full border rounded-lg pl-8 p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                    </div>
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <button 
-                        type="submit" 
-                        disabled={formLoading}
-                        className="bg-indigo-600 text-white h-10 px-6 rounded-lg font-bold text-sm hover:bg-indigo-700 w-full transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                        {formLoading ? '...' : <Save className="w-4 h-4" />} Salvar
-                    </button>
-                    <button type="button" onClick={() => setShowStudentForm(false)} className="bg-slate-100 text-slate-500 h-10 px-4 rounded-lg"><X className="w-4 h-4" /></button>
+              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2">
+                <form onSubmit={handleStudentSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <input type="text" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="Nome" required />
+                  <input type="email" value={studentForm.email} onChange={e => setStudentForm({...studentForm, email: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="E-mail" required />
+                  <input type="text" value={studentForm.phone} onChange={e => setStudentForm({...studentForm, phone: formatPhone(e.target.value)})} className="border rounded-lg p-2 text-sm" placeholder="Telefone" required />
+                  <input type="text" value={studentForm.password} onChange={e => setStudentForm({...studentForm, password: e.target.value})} className="border rounded-lg p-2 text-sm font-mono" required />
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={formLoading} className="bg-indigo-600 text-white px-4 rounded-lg text-sm font-bold flex-1">{formLoading ? '...' : 'Salvar'}</button>
+                    <button type="button" onClick={() => setShowStudentForm(false)} className="bg-slate-100 px-2 rounded-lg"><X className="w-4 h-4" /></button>
                   </div>
                 </form>
               </div>
             )}
-
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 font-bold text-slate-500">
-                  <tr>
-                    <th className="px-6 py-4 text-left">Aluno</th>
-                    <th className="px-6 py-4 text-left">Contato</th>
-                    <th className="px-6 py-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {students.map(s => (
-                    <tr key={s.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4">
-                        <div className="font-medium text-slate-900">{s.name}</div>
-                        <div className="text-xs text-slate-400 uppercase font-bold tracking-tighter">ID: {s.id.substring(0,8)}</div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-500">
-                        <div className="flex flex-col">
-                          <span className="flex items-center gap-1 text-xs"><Mail className="w-3 h-3" /> {s.email}</span>
-                          <span className="flex items-center gap-1 text-xs"><Phone className="w-3 h-3" /> {s.phone || 'Sem telefone'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button onClick={() => deleteUser(s.id)} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50 font-bold text-slate-500 text-xs text-left">
+                        <tr><th className="px-6 py-4">Nome</th><th className="px-6 py-4">Contato</th><th className="px-6 py-4 text-right">Ações</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                        {students.map(s => (
+                            <tr key={s.id} className="hover:bg-slate-50 text-sm">
+                                <td className="px-6 py-4 font-medium">{s.name}</td>
+                                <td className="px-6 py-4 text-slate-500">{s.email} | {s.phone}</td>
+                                <td className="px-6 py-4 text-right"><button onClick={() => deleteUser(s.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
           </div>
         )}
 
-        {/* --- ABA RELATÓRIOS --- */}
         {activeTab === 'reports' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h1 className="text-2xl font-bold text-slate-800">Relatórios Gerenciais</h1>
-              <div className="flex bg-slate-200 p-1 rounded-lg">
-                <button onClick={() => setReportSubTab('attendance')} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${reportSubTab === 'attendance' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`}>Presença por Aula</button>
-                <button onClick={() => setReportSubTab('students')} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${reportSubTab === 'students' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`}>Desempenho de Alunos</button>
-              </div>
+            <h1 className="text-2xl font-bold text-slate-800">Relatórios Gerenciais</h1>
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                     <label className="text-sm font-bold text-slate-600">Data:</label>
+                     <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm" />
+                </div>
             </div>
-
-            {reportSubTab === 'attendance' ? (
-              <div className="space-y-4">
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                    <Filter className="w-5 h-5 text-slate-400" />
-                    <div className="flex items-center gap-2">
-                         <label className="text-sm font-bold text-slate-600">Data:</label>
-                         <input 
-                            type="date" 
-                            value={reportDate} 
-                            onChange={(e) => setReportDate(e.target.value)} 
-                            className="border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700"
-                         />
-                    </div>
-                </div>
-                <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50 font-bold text-slate-500">
-                      <tr>
-                        <th className="px-6 py-4 text-left">Hora</th>
-                        <th className="px-6 py-4 text-left">Modalidade & Instrutor</th>
-                        <th className="px-6 py-4 text-center">Inscritos</th>
-                        <th className="px-6 py-4 text-center">Frequência</th>
-                        <th className="px-6 py-4 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {sessions
-                          .filter(session => isSameDay(parseISO(session.startTime), parseISO(reportDate)))
-                          .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-                          .map(session => {
-                              const modality = modalities.find(m => m.id === session.modalityId);
-                              const stats = getSessionStats(session.id);
-                              const attendanceRate = stats.total > 0 ? Math.round((stats.attended / stats.total) * 100) : 0;
-                              
-                              return (
-                                  <tr key={session.id} className="hover:bg-slate-50">
-                                      <td className="px-6 py-4 font-bold text-slate-700">{format(parseISO(session.startTime), 'HH:mm')}</td>
-                                      <td className="px-6 py-4">
-                                          <div className="font-medium text-slate-900">{modality?.name || 'Geral'}</div>
-                                          <div className="text-xs text-slate-500">{session.instructor}</div>
-                                      </td>
-                                      <td className="px-6 py-4 text-center font-bold text-indigo-600">{stats.total}</td>
-                                      <td className="px-6 py-4 text-center font-bold">{attendanceRate}%</td>
-                                      <td className="px-6 py-4 text-center">
-                                           <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${stats.total === 0 ? 'bg-slate-100 text-slate-500' : 'bg-green-100 text-green-700'}`}>
-                                                {stats.total === 0 ? 'Sem Alunos' : 'Finalizada'}
-                                           </span>
-                                      </td>
-                                  </tr>
-                              );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                  <thead className="bg-slate-50 font-bold text-slate-500">
-                    <tr>
-                      <th className="px-6 py-4 text-left uppercase tracking-tighter text-[10px]">Aluno</th>
-                      <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Agendamentos</th>
-                      <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Presenças</th>
-                      <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Faltas</th>
-                      <th className="px-6 py-4 text-center uppercase tracking-tighter text-[10px]">Aproveitamento</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {students.map(s => {
-                      const stats = getStudentStats(s.id);
-                      const percent = stats.total > 0 ? Math.round((stats.attended / (stats.attended + stats.missed || 1)) * 100) : 0;
+            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 font-bold text-slate-500">
+                  <tr><th className="px-6 py-4 text-left">Hora</th><th className="px-6 py-4 text-left">Modalidade</th><th className="px-6 py-4 text-center">Inscritos</th><th className="px-6 py-4 text-center">Status</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {sessions.filter(s => isSameDay(parseISO(s.startTime), parseISO(reportDate))).map(s => {
+                      const stats = getSessionStats(s.id);
                       return (
-                        <tr key={s.id} className="hover:bg-slate-50">
-                          <td className="px-6 py-4 font-medium text-slate-900">{s.name}</td>
-                          <td className="px-6 py-4 text-center text-slate-600 font-bold">{stats.total}</td>
-                          <td className="px-6 py-4 text-center text-green-600 font-bold">{stats.attended}</td>
-                          <td className="px-6 py-4 text-center text-red-600 font-bold">{stats.missed}</td>
-                          <td className="px-6 py-4 text-center font-bold">{percent}%</td>
-                        </tr>
+                          <tr key={s.id} className="hover:bg-slate-50">
+                              <td className="px-6 py-4 font-bold">{format(parseISO(s.startTime), 'HH:mm')}</td>
+                              <td className="px-6 py-4">{modalities.find(m => m.id === s.modalityId)?.name}</td>
+                              <td className="px-6 py-4 text-center font-bold text-indigo-600">{stats.total}</td>
+                              <td className="px-6 py-4 text-center"><span className="px-2 py-1 rounded text-[10px] font-bold uppercase bg-green-100 text-green-700">Ativa</span></td>
+                          </tr>
                       );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </main>

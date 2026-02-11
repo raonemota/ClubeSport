@@ -21,7 +21,6 @@ export const StoreProvider = ({ children }) => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(Notification.permission === 'granted');
   const notifiedSessions = useRef(new Set());
   
-  // REF PARA BLOQUEAR RE-FETCH DURANTE TROCA DE SENHA
   const isUpdatingPassword = useRef(false);
 
   useEffect(() => {
@@ -59,12 +58,7 @@ export const StoreProvider = ({ children }) => {
     initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // SE ESTIVERMOS NO MEIO DE UMA ATUALIZAÇÃO DE SENHA, IGNORAMOS O EVENTO DO SUPABASE
-      // PARA NÃO SOBRESCREVER O ESTADO LOCAL COM DADOS ANTIGOS
-      if (isUpdatingPassword.current) {
-          console.log("Evento Auth ignorado devido a atualização de senha em andamento.");
-          return;
-      }
+      if (isUpdatingPassword.current) return;
 
       if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
@@ -108,7 +102,7 @@ export const StoreProvider = ({ children }) => {
     const { data: bks } = await supabase.from('bookings').select('*');
     if (bks) setBookings(bks.map(b => ({ id: b.id, sessionId: b.session_id, userId: b.user_id, status: b.status, bookedAt: b.booked_at })));
     const { data: usrs } = await supabase.from('profiles').select('*');
-    if (usrs) setUsers(usrs.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, planType: u.plan_type, observation: u.observation, mustChangePassword: u.must_change_password })));
+    if (usrs) setUsers(usrs.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, planType: u.plan_type, observation: u.observation, must_change_password: u.must_change_password })));
   };
 
   const login = async (identifier, pass) => {
@@ -119,23 +113,13 @@ export const StoreProvider = ({ children }) => {
     }
     
     let emailToUse = identifier.trim();
-    
     if (!emailToUse.includes('@')) {
         const { data } = await supabase.from('profiles').select('email').eq('phone', emailToUse).single();
-        if (data) {
-            emailToUse = data.email;
-        } else {
-            console.warn("Login: Telefone não encontrado no cadastro.");
-            return false;
-        }
+        if (data) emailToUse = data.email;
+        else return false;
     }
     
     const { error } = await supabase.auth.signInWithPassword({ email: emailToUse, password: pass });
-    
-    if (error) {
-        console.error("Erro no login:", error.message);
-    }
-    
     return !error;
   };
 
@@ -147,148 +131,34 @@ export const StoreProvider = ({ children }) => {
       setUsers([...users, newUser]); 
       return { success: true }; 
     }
-    
     try {
       const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }
       });
-
-      const { data: authData, error: authError } = await tempClient.auth.signUp({
-        email: userData.email,
-        password: userData.password,
-      });
-
+      const { data: authData, error: authError } = await tempClient.auth.signUp({ email: userData.email, password: userData.password });
       if (authError) return { success: false, error: authError.message };
-
       const newUserId = authData.user?.id;
-      if (!newUserId) return { success: false, error: "Usuário criado, mas ID não retornado." };
-
-      const payload = {
-        id: newUserId,
-        email: userData.email,
-        name: userData.name,
-        phone: userData.phone,
-        role: role,
-        must_change_password: true
-      };
-
+      const payload = { id: newUserId, email: userData.email, name: userData.name, phone: userData.phone, role: role, must_change_password: true };
       const { error: profileError } = await supabase.from('profiles').insert([payload]);
-
-      if (profileError) {
-        if (profileError.code === '23505') {
-             const { error: updateError } = await supabase.from('profiles').update(payload).eq('email', userData.email);
-             if (updateError) return { success: false, error: updateError.message };
-        } else {
-             return { success: false, error: profileError.message };
-        }
-      }
-
       await fetchData(); 
       return { success: true };
-
     } catch (err) {
-      console.error("Exceção no registro:", err);
-      return { success: false, error: "Falha inesperada no processamento." };
+      return { success: false, error: "Falha inesperada." };
     }
   };
 
-  const addSession = async (data) => {
-    if (!supabase) { setSessions([...sessions, { ...data, id: Math.random().toString(36).substr(2, 9) }]); return; }
-    await supabase.from('class_sessions').insert([{ modality_id: data.modalityId, instructor: data.instructor, start_time: data.startTime, duration_minutes: data.durationMinutes, capacity: data.capacity, category: data.category }]);
-    fetchData();
-  };
-
-  const deleteSession = async (sessionId) => {
-    if (!supabase) { setSessions(sessions.filter(s => s.id !== sessionId)); return; }
-    await supabase.from('class_sessions').delete().eq('id', sessionId);
-    fetchData();
-  };
-
-  const deleteModality = async (modalityId) => {
-    if (!supabase) { setModalities(modalities.filter(m => m.id !== modalityId)); return; }
-    await supabase.from('modalities').delete().eq('id', modalityId);
-    fetchData();
-  };
-
-  const updateBookingStatus = async (bookingId, status) => {
-    if (!supabase) {
-      setBookings(bookings.map(b => b.id === bookingId ? { ...b, status } : b));
-      return true;
-    }
-    const { error } = await supabase.from('bookings').update({ status }).eq('id', bookingId);
-    if (!error) fetchData();
-    return !error;
-  };
-
-  const getStudentStats = (studentId) => {
-    const studentBookings = bookings.filter(b => b.userId === studentId);
-    return {
-      total: studentBookings.length,
-      attended: studentBookings.filter(b => b.status === BookingStatus.ATTENDED).length,
-      missed: studentBookings.filter(b => b.status === BookingStatus.MISSED).length,
-      pending: studentBookings.filter(b => b.status === BookingStatus.CONFIRMED).length
-    };
-  };
-
-  const requestNotificationPermission = async () => {
-    if (!('Notification' in window)) return;
-    const permission = await Notification.requestPermission();
-    setNotificationsEnabled(permission === 'granted');
-  };
-
-  const getSessionBookingsCount = (sessionId) => {
-    return bookings.filter(b => b.sessionId === sessionId && b.status !== BookingStatus.CANCELLED_BY_STUDENT && b.status !== BookingStatus.CANCELLED_BY_ADMIN).length;
-  };
-
-  // --- LÓGICA DE ATUALIZAÇÃO DE SENHA CORRIGIDA E BLINDADA ---
   const updatePassword = async (newPassword) => {
-      console.log("Iniciando updatePassword...");
       if (!supabase) {
           const updatedUser = { ...currentUser, mustChangePassword: false };
           setCurrentUser(updatedUser);
-          setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
           return true;
       }
-      
-      // BLOQUEAR RE-FETCH
       isUpdatingPassword.current = true;
-
-      // 1. Atualizar Auth do Supabase
       const { error } = await supabase.auth.updateUser({ password: newPassword });
-      
-      if (error) {
-          console.error("Erro FATAL ao atualizar senha no Auth:", error.message);
-          isUpdatingPassword.current = false;
-          return false;
-      }
-
-      console.log("Senha Auth atualizada. Atualizando perfil...");
-
-      // 2. Atualizar tabela de Profiles (DB)
-      const { error: profileError } = await supabase.from('profiles')
-          .update({ must_change_password: false })
-          .eq('id', currentUser.id);
-
-      if (profileError) {
-          console.warn("Aviso: Falha ao atualizar perfil no DB (Possível erro de RLS).", profileError.message);
-          // Mesmo que falhe no DB, para a sessão ATUAL, vamos considerar sucesso
-      } else {
-          console.log("Perfil DB atualizado com sucesso.");
-      }
-      
-      // 3. ATUALIZAÇÃO MANUAL E IMEDIATA DO ESTADO
-      // Forçamos o estado local para garantir que a UI desbloqueie
-      const updatedUser = { ...currentUser, mustChangePassword: false };
-      setCurrentUser(updatedUser);
-      console.log("Estado local forçado para:", updatedUser);
-
-      // 4. DESBLOQUEAR APÓS TIMEOUT SEGURO
-      // Mantemos o bloqueio por alguns segundos para evitar que o listener do Auth sobrescreva nossos dados
-      setTimeout(() => {
-          isUpdatingPassword.current = false;
-          // Opcional: tentar sincronizar silenciosamente depois
-      }, 3000);
-
+      if (error) { isUpdatingPassword.current = false; return false; }
+      await supabase.from('profiles').update({ must_change_password: false }).eq('id', currentUser.id);
+      setCurrentUser({ ...currentUser, mustChangePassword: false });
+      setTimeout(() => { isUpdatingPassword.current = false; }, 3000);
       return true;
   };
 
@@ -296,6 +166,7 @@ export const StoreProvider = ({ children }) => {
     <StoreContext.Provider value={{
       currentUser, users, modalities, sessions, bookings, loading, bookingReleaseHour, notificationsEnabled,
       login, logout, addSession, deleteSession, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, updatePassword,
+      updateBookingReleaseHour: (h) => setBookingReleaseHour(parseInt(h)),
       addModality: async (d) => { if (!supabase) setModalities([...modalities, {...d, id: Date.now().toString()}]); else await supabase.from('modalities').insert([{name: d.name, description: d.description, image_url: d.imageUrl}]); fetchData(); },
       updateUser: async (id, upd) => { if (!supabase) setUsers(users.map(u => u.id === id ? {...u, ...upd} : u)); else await supabase.from('profiles').update({name: upd.name, phone: upd.phone, plan_type: upd.planType, role: upd.role}).eq('id', id); fetchData(); },
       deleteUser: async (id) => { if (!supabase) setUsers(users.filter(u => u.id !== id)); else await supabase.from('profiles').update({role: UserRole.INACTIVE}).eq('id', id); fetchData(); },
