@@ -13,7 +13,7 @@ import { ConfirmationModal } from '../../components/ConfirmationModal';
 export const AdminPanel = () => {
   const { 
     modalities, sessions, users, bookings, bookingReleaseHour, updateBookingReleaseHour,
-    registerUser, updateUser, deleteUser, getStudentStats, addModality, deleteModality, addSession, deleteSession,
+    registerUser, updateUser, deleteUser, getStudentStats, addModality, deleteModality, addSession, updateSession, deleteSession,
     cancelBooking, addSessionsBatch, deleteSessions
   } = useStore();
   
@@ -31,6 +31,7 @@ export const AdminPanel = () => {
   const [modalityForm, setModalityForm] = useState({ name: '', description: '', imageUrl: '' });
 
   const [showSessionForm, setShowSessionForm] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState(null);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [sessionForm, setSessionForm] = useState({ modalityId: '', instructor: '', date: '', time: '', durationMinutes: 60, capacity: 10, category: '' });
   
@@ -165,8 +166,16 @@ export const AdminPanel = () => {
   const handleSessionSubmit = async (e) => {
     e.preventDefault();
     const startTime = new Date(`${sessionForm.date}T${sessionForm.time}`).toISOString();
-    await addSession({ ...sessionForm, startTime });
+    
+    if (editingSessionId) {
+        await updateSession(editingSessionId, { ...sessionForm, startTime });
+    } else {
+        await addSession({ ...sessionForm, startTime });
+    }
+    
     setShowSessionForm(false);
+    setEditingSessionId(null);
+    setSessionForm({ modalityId: '', instructor: '', date: '', time: '', durationMinutes: 60, capacity: 10, category: '' });
   };
 
   const getSessionStats = (sessionId) => {
@@ -220,13 +229,13 @@ export const AdminPanel = () => {
               </div>
               <div className="flex gap-2">
                   <button 
-                    onClick={() => { setShowSessionForm(!showSessionForm); setIsBatchMode(true); }} 
+                    onClick={() => { setEditingSessionId(null); setShowSessionForm(!showSessionForm); setIsBatchMode(true); }} 
                     className="bg-white border border-indigo-200 text-indigo-600 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-50 shadow-sm transition-all text-sm font-bold"
                   >
                     <Copy className="w-4 h-4" /> Criar em Lote
                   </button>
                   <button 
-                    onClick={() => { setShowSessionForm(!showSessionForm); setIsBatchMode(false); }} 
+                    onClick={() => { setEditingSessionId(null); setShowSessionForm(!showSessionForm); setIsBatchMode(false); setSessionForm({ modalityId: '', instructor: '', date: '', time: '', durationMinutes: 60, capacity: 10, category: '' }); }} 
                     className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-sm transition-all text-sm font-bold"
                   >
                     <Plus className="w-4 h-4" /> Nova Única
@@ -270,12 +279,12 @@ export const AdminPanel = () => {
             </div>
 
             {showSessionForm && (
-              <div className="bg-white p-6 rounded-xl border-2 border-indigo-50 shadow-xl animate-in slide-in-from-top-4">
+              <div className={`bg-white p-6 rounded-xl border-2 ${editingSessionId ? 'border-orange-200 ring-2 ring-orange-50' : 'border-indigo-50'} shadow-xl animate-in slide-in-from-top-4`}>
                  <div className="flex justify-between items-center mb-6">
                     <h3 className="font-black text-indigo-900 flex items-center gap-2">
-                        {isBatchMode ? <><Copy className="w-5 h-5 text-indigo-600" /> Criação em Lote</> : <><Calendar className="w-5 h-5 text-indigo-600" /> Nova Aula Avulsa</>}
+                        {isBatchMode ? <><Copy className="w-5 h-5 text-indigo-600" /> Criação em Lote</> : <><Calendar className="w-5 h-5 text-indigo-600" /> {editingSessionId ? 'Editar Aula' : 'Nova Aula Avulsa'}</>}
                     </h3>
-                    <button onClick={() => setShowSessionForm(false)} className="text-slate-400 hover:text-slate-600"><X /></button>
+                    <button onClick={() => { setShowSessionForm(false); setEditingSessionId(null); }} className="text-slate-400 hover:text-slate-600"><X /></button>
                  </div>
 
                  {isBatchMode ? (
@@ -401,8 +410,10 @@ export const AdminPanel = () => {
                             <input type="text" value={sessionForm.category} onChange={e => setSessionForm({...sessionForm, category: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="Categoria" />
                         </div>
                         <div className="flex justify-end gap-2 border-t pt-4">
-                            <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-md">Adicionar Única</button>
-                            <button type="button" onClick={() => setShowSessionForm(false)} className="bg-slate-100 px-4 py-2 rounded-lg font-medium">Cancelar</button>
+                            <button type="submit" className={`${editingSessionId ? 'bg-orange-600' : 'bg-indigo-600'} text-white px-6 py-2 rounded-lg font-bold shadow-md`}>
+                                {editingSessionId ? 'Atualizar Aula' : 'Adicionar Única'}
+                            </button>
+                            <button type="button" onClick={() => { setShowSessionForm(false); setEditingSessionId(null); }} className="bg-slate-100 px-4 py-2 rounded-lg font-medium">Cancelar</button>
                         </div>
                      </form>
                  )}
@@ -448,12 +459,36 @@ export const AdminPanel = () => {
                             <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{s.capacity}</span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button 
-                            onClick={() => openDeleteModal('session', s.id, 'Excluir Aula', `Deseja excluir a aula de ${m?.name} em ${format(parseISO(s.startTime), 'dd/MM HH:mm')}?`)} 
-                            className="text-slate-300 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex justify-end gap-2">
+                              <button 
+                                onClick={() => {
+                                    setEditingSessionId(s.id);
+                                    const d = parseISO(s.startTime);
+                                    setSessionForm({
+                                        modalityId: s.modalityId,
+                                        instructor: s.instructor,
+                                        date: format(d, 'yyyy-MM-dd'),
+                                        time: format(d, 'HH:mm'),
+                                        durationMinutes: s.duration_minutes,
+                                        capacity: s.capacity,
+                                        category: s.category || ''
+                                    });
+                                    setIsBatchMode(false);
+                                    setShowSessionForm(true);
+                                }} 
+                                className="text-slate-300 hover:text-orange-500 transition-colors"
+                                title="Editar Aula"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => openDeleteModal('session', s.id, 'Excluir Aula', `Deseja excluir a aula de ${m?.name} em ${format(parseISO(s.startTime), 'dd/MM HH:mm')}?`)} 
+                                className="text-slate-300 hover:text-red-500 transition-colors"
+                                title="Excluir Aula"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                          </div>
                         </td>
                       </tr>
                     );

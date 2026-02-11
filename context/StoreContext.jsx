@@ -213,6 +213,22 @@ export const StoreProvider = ({ children }) => {
     fetchData();
   };
 
+  const updateSession = async (id, data) => {
+    if (!supabase) {
+      setSessions(sessions.map(s => s.id === id ? { ...s, ...data } : s));
+    } else {
+      await supabase.from('class_sessions').update({
+        modality_id: data.modalityId,
+        instructor: data.instructor,
+        start_time: data.startTime,
+        duration_minutes: data.durationMinutes,
+        capacity: data.capacity,
+        category: data.category
+      }).eq('id', id);
+    }
+    fetchData();
+  };
+
   const addSessionsBatch = async (batchData) => {
     const { modalityId, instructor, startDate, endDate, times, daysOfWeek, capacity, category, durationMinutes } = batchData;
     const newSessions = [];
@@ -317,7 +333,7 @@ export const StoreProvider = ({ children }) => {
   return (
     <StoreContext.Provider value={{
       currentUser, users, modalities, sessions, bookings, loading, bookingReleaseHour, notificationsEnabled,
-      login, logout, addSession, addSessionsBatch, deleteSession, deleteSessions, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, updatePassword,
+      login, logout, addSession, updateSession, addSessionsBatch, deleteSession, deleteSessions, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, updatePassword,
       updateBookingReleaseHour: (h) => setBookingReleaseHour(parseInt(h)),
       addModality: async (d) => { if (!supabase) setModalities([...modalities, {...d, id: Date.now().toString()}]); else await supabase.from('modalities').insert([{name: d.name, description: d.description, image_url: d.imageUrl}]); fetchData(); },
       updateUser: async (id, upd) => { 
