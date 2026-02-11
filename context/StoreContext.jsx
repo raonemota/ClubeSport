@@ -4,7 +4,7 @@ import { UserRole, BookingStatus } from '../types.js';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabaseClient.js';
 import { createClient } from '@supabase/supabase-js';
 import { INITIAL_USERS, INITIAL_MODALITIES, INITIAL_SESSIONS, INITIAL_BOOKINGS } from '../services/mockData.js';
-import { isSameDay, parseISO, differenceInMinutes } from 'date-fns';
+import { isSameDay, parseISO, addDays, format } from 'date-fns';
 
 const StoreContext = createContext(undefined);
 
@@ -100,7 +100,7 @@ export const StoreProvider = ({ children }) => {
       if (mods) setModalities(mods.map(m => ({ id: m.id, name: m.name, description: m.description, imageUrl: m.image_url })));
       
       const { data: sess } = await supabase.from('class_sessions').select('*');
-      if (sess) setSessions(sess.map(s => ({ id: s.id, modalityId: s.modality_id, instructor: s.instructor, startTime: s.start_time, durationMinutes: s.duration_minutes, capacity: s.capacity, category: s.category })));
+      if (sess) setSessions(sess.map(s => ({ id: s.id, modalityId: s.modality_id, instructor: s.instructor, startTime: s.start_time, duration_minutes: s.duration_minutes, capacity: s.capacity, category: s.category })));
       
       const { data: bks } = await supabase.from('bookings').select('*');
       if (bks) setBookings(bks.map(b => ({ id: b.id, sessionId: b.session_id, userId: b.user_id, status: b.status, bookedAt: b.booked_at })));
@@ -205,9 +205,62 @@ export const StoreProvider = ({ children }) => {
     fetchData();
   };
 
+  const addSessionsBatch = async (batchData) => {
+    const { modalityId, instructor, startDate, endDate, times, daysOfWeek, capacity, category, durationMinutes } = batchData;
+    const newSessions = [];
+    let current = parseISO(startDate);
+    const end = parseISO(endDate);
+
+    while (current <= end) {
+      const day = current.getDay(); // 0-6 (Dom-Sab)
+      // Ajuste para o padrão solicitado: Seg=1, Ter=2 ... Dom=0
+      if (daysOfWeek.includes(day)) {
+        times.forEach(time => {
+          const [hours, minutes] = time.split(':');
+          const sessionDate = new Date(current);
+          sessionDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+          
+          newSessions.push({
+            modality_id: modalityId,
+            instructor,
+            start_time: sessionDate.toISOString(),
+            duration_minutes: durationMinutes,
+            capacity,
+            category
+          });
+        });
+      }
+      current = addDays(current, 1);
+    }
+
+    if (!supabase) {
+      const withIds = newSessions.map(s => ({
+        ...s, 
+        id: Math.random().toString(36).substr(2, 9), 
+        modalityId: s.modality_id, 
+        startTime: s.start_time, 
+        duration_minutes: s.duration_minutes
+      }));
+      setSessions(prev => [...prev, ...withIds]);
+    } else {
+      const { error } = await supabase.from('class_sessions').insert(newSessions);
+      if (error) console.error("Erro ao criar lote:", error);
+    }
+    await fetchData();
+  };
+
   const deleteSession = async (id) => {
     if (!supabase) setSessions(sessions.filter(s => s.id !== id));
     else await supabase.from('class_sessions').delete().eq('id', id);
+    fetchData();
+  };
+
+  const deleteSessions = async (ids) => {
+    if (!supabase) {
+      setSessions(sessions.filter(s => !ids.includes(s.id)));
+    } else {
+      await supabase.from('class_sessions').delete().in('id', ids);
+    }
     fetchData();
   };
 
@@ -254,7 +307,7 @@ export const StoreProvider = ({ children }) => {
   return (
     <StoreContext.Provider value={{
       currentUser, users, modalities, sessions, bookings, loading, bookingReleaseHour, notificationsEnabled,
-      login, logout, addSession, deleteSession, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, updatePassword,
+      login, logout, addSession, addSessionsBatch, deleteSession, deleteSessions, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, updatePassword,
       updateBookingReleaseHour: (h) => setBookingReleaseHour(parseInt(h)),
       addModality: async (d) => { if (!supabase) setModalities([...modalities, {...d, id: Date.now().toString()}]); else await supabase.from('modalities').insert([{name: d.name, description: d.description, image_url: d.imageUrl}]); fetchData(); },
       updateUser: async (id, upd) => { 
@@ -305,7 +358,7 @@ export const StoreProvider = ({ children }) => {
           await fetchData();
         } catch (err) {
           console.error("Erro ao cancelar reserva:", err);
-          alert("Erro ao cancelar a reserva no servidor (400 Bad Request). Verifique se o status 'CANCELLED' é aceito.");
+          alert("Erro ao cancelar a reserva no servidor.");
         }
       }
     }}>

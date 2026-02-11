@@ -1,12 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { 
   Plus, Trash2, Edit, Calendar, Dumbbell, Users, X, FileText, 
   GraduationCap, Phone, Mail, Clock, Filter, Save, Info, 
-  AlertCircle, ShieldCheck, Key, Settings, ChevronDown, ChevronUp, UserX, UserCheck, Layers
+  AlertCircle, ShieldCheck, Key, Settings, ChevronDown, ChevronUp, UserX, UserCheck, Layers, CheckSquare, Square, Copy
 } from 'lucide-react';
-import { format, parseISO, isSameDay } from 'date-fns';
+import { format, parseISO, isSameDay, addDays } from 'date-fns';
 import { UserRole, BookingStatus } from '../../types.js';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 
@@ -14,7 +14,7 @@ export const AdminPanel = () => {
   const { 
     modalities, sessions, users, bookings, bookingReleaseHour, updateBookingReleaseHour,
     registerUser, updateUser, deleteUser, getStudentStats, addModality, deleteModality, addSession, deleteSession,
-    cancelBooking
+    cancelBooking, addSessionsBatch, deleteSessions
   } = useStore();
   
   const [activeTab, setActiveTab] = useState('reports');
@@ -31,7 +31,19 @@ export const AdminPanel = () => {
   const [modalityForm, setModalityForm] = useState({ name: '', description: '', imageUrl: '' });
 
   const [showSessionForm, setShowSessionForm] = useState(false);
+  const [isBatchMode, setIsBatchMode] = useState(false);
   const [sessionForm, setSessionForm] = useState({ modalityId: '', instructor: '', date: '', time: '', durationMinutes: 60, capacity: 10, category: '' });
+  
+  // Estado para Lote
+  const [batchForm, setBatchForm] = useState({
+    modalityId: '', instructor: '', startDate: '', endDate: '', 
+    times: ['08:00'], daysOfWeek: [], capacity: 10, category: '', durationMinutes: 60
+  });
+
+  // Filtros da Grade
+  const [scheduleFilterDate, setScheduleFilterDate] = useState('');
+  const [scheduleFilterModality, setScheduleFilterModality] = useState('all');
+  const [selectedSessionIds, setSelectedSessionIds] = useState(new Set());
 
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportModality, setReportModality] = useState('all');
@@ -49,7 +61,68 @@ export const AdminPanel = () => {
   const teachers = users.filter(u => u.role === UserRole.TEACHER);
   const students = users.filter(u => u.role === UserRole.STUDENT);
 
-  const availableTeachersForSession = teachers.filter(t => t.modalityId === sessionForm.modalityId);
+  const filteredScheduleSessions = useMemo(() => {
+    return sessions.filter(s => {
+      const dateMatch = !scheduleFilterDate || isSameDay(parseISO(s.startTime), parseISO(scheduleFilterDate));
+      const modalityMatch = scheduleFilterModality === 'all' || s.modalityId === scheduleFilterModality;
+      return dateMatch && modalityMatch;
+    }).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+  }, [sessions, scheduleFilterDate, scheduleFilterModality]);
+
+  const toggleSessionSelection = (id) => {
+    const newSelection = new Set(selectedSessionIds);
+    if (newSelection.has(id)) newSelection.delete(id);
+    else newSelection.add(id);
+    setSelectedSessionIds(newSelection);
+  };
+
+  const selectAllFiltered = () => {
+    if (selectedSessionIds.size === filteredScheduleSessions.length) {
+      setSelectedSessionIds(new Set());
+    } else {
+      setSelectedSessionIds(new Set(filteredScheduleSessions.map(s => s.id)));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    openDeleteModal(
+        'bulk_delete', 
+        Array.from(selectedSessionIds), 
+        'Excluir Selecionados', 
+        `Deseja excluir permanentemente as ${selectedSessionIds.size} aulas selecionadas? Isso também removerá as reservas vinculadas.`
+    );
+  };
+
+  const handleConfirmDelete = async () => {
+    const { type, id } = deleteModal;
+    if (type === 'session') await deleteSession(id);
+    else if (type === 'bulk_delete') {
+        await deleteSessions(id);
+        setSelectedSessionIds(new Set());
+    }
+    else if (type === 'modality') await deleteModality(id);
+    else if (type === 'user') await deleteUser(id);
+    else if (type === 'cancel_booking') await cancelBooking(id);
+    
+    setDeleteModal({ isOpen: false, type: null, id: null, title: '', message: '' });
+  };
+
+  const handleBatchSubmit = async (e) => {
+    e.preventDefault();
+    if (batchForm.daysOfWeek.length === 0) {
+        alert("Selecione pelo menos um dia da semana.");
+        return;
+    }
+    setFormLoading(true);
+    await addSessionsBatch(batchForm);
+    setFormLoading(false);
+    setShowSessionForm(false);
+    setIsBatchMode(false);
+    setBatchForm({
+      modalityId: '', instructor: '', startDate: '', endDate: '', 
+      times: ['08:00'], daysOfWeek: [], capacity: 10, category: '', durationMinutes: 60
+    });
+  };
 
   const formatPhone = (value) => {
     value = value.replace(/\D/g, "");
@@ -65,28 +138,6 @@ export const AdminPanel = () => {
     setDeleteModal({ isOpen: true, type, id, title, message });
   };
 
-  const handleConfirmDelete = async () => {
-    const { type, id } = deleteModal;
-    if (type === 'session') await deleteSession(id);
-    else if (type === 'modality') await deleteModality(id);
-    else if (type === 'user') await deleteUser(id);
-    else if (type === 'cancel_booking') await cancelBooking(id);
-    
-    setDeleteModal({ isOpen: false, type: null, id: null, title: '', message: '' });
-  };
-
-  const handleEditTeacherClick = (teacher) => {
-    setTeacherForm({
-      name: teacher.name,
-      phone: teacher.phone,
-      email: teacher.email,
-      password: '', 
-      modalityId: teacher.modalityId || ''
-    });
-    setEditingTeacherId(teacher.id);
-    setShowTeacherForm(true);
-  };
-
   const handleTeacherSubmit = async (e) => {
     e.preventDefault();
     if (!teacherForm.modalityId) {
@@ -94,26 +145,13 @@ export const AdminPanel = () => {
         return;
     }
     setFormLoading(true);
-
     if (editingTeacherId) {
-      const success = await updateUser(editingTeacherId, {
-        name: teacherForm.name,
-        phone: teacherForm.phone,
-        email: teacherForm.email,
-        modalityId: teacherForm.modalityId
-      });
-      if (success) {
-        alert("Professor atualizado com sucesso!");
-        resetTeacherForm();
-      }
+      const success = await updateUser(editingTeacherId, teacherForm);
+      if (success) resetTeacherForm();
     } else {
       const result = await registerUser(teacherForm, UserRole.TEACHER);
-      if (result.success) {
-        alert(`Professor cadastrado com sucesso!`);
-        resetTeacherForm();
-      } else {
-        alert("Erro: " + result.error);
-      }
+      if (result.success) resetTeacherForm();
+      else alert("Erro: " + result.error);
     }
     setFormLoading(false);
   };
@@ -124,30 +162,10 @@ export const AdminPanel = () => {
     setShowTeacherForm(false);
   };
 
-  const handleStudentSubmit = async (e) => {
-    e.preventDefault();
-    setFormLoading(true);
-    const result = await registerUser(studentForm, UserRole.STUDENT);
-    if (result.success) {
-      alert(`Aluno cadastrado com sucesso!`);
-      setStudentForm({ name: '', phone: '', email: '', password: 'mudar@123', planType: 'Mensalista' });
-      setShowStudentForm(false);
-    }
-    setFormLoading(false);
-  };
-
-  const handleModalitySubmit = async (e) => {
-    e.preventDefault();
-    await addModality(modalityForm);
-    setModalityForm({ name: '', description: '', imageUrl: '' });
-    setShowModalityForm(false);
-  };
-
   const handleSessionSubmit = async (e) => {
     e.preventDefault();
     const startTime = new Date(`${sessionForm.date}T${sessionForm.time}`).toISOString();
     await addSession({ ...sessionForm, startTime });
-    setSessionForm({ modalityId: '', instructor: '', date: '', time: '', durationMinutes: 60, capacity: 10, category: '' });
     setShowSessionForm(false);
   };
 
@@ -166,6 +184,11 @@ export const AdminPanel = () => {
       {label}
     </button>
   );
+
+  const WEEK_DAYS = [
+    { label: 'Seg', val: 1 }, { label: 'Ter', val: 2 }, { label: 'Qua', val: 3 }, 
+    { label: 'Qui', val: 4 }, { label: 'Sex', val: 5 }, { label: 'Sab', val: 6 }, { label: 'Dom', val: 0 }
+  ];
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
@@ -188,6 +211,265 @@ export const AdminPanel = () => {
       </aside>
 
       <main className="flex-1 p-8">
+        {activeTab === 'schedule' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-800">Grade Horária</h1>
+                <p className="text-xs text-slate-400">Gerencie as janelas de aulas e horários.</p>
+              </div>
+              <div className="flex gap-2">
+                  <button 
+                    onClick={() => { setShowSessionForm(!showSessionForm); setIsBatchMode(true); }} 
+                    className="bg-white border border-indigo-200 text-indigo-600 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-50 shadow-sm transition-all text-sm font-bold"
+                  >
+                    <Copy className="w-4 h-4" /> Criar em Lote
+                  </button>
+                  <button 
+                    onClick={() => { setShowSessionForm(!showSessionForm); setIsBatchMode(false); }} 
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-sm transition-all text-sm font-bold"
+                  >
+                    <Plus className="w-4 h-4" /> Nova Única
+                  </button>
+              </div>
+            </div>
+
+            {/* Filtros da Grade */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                    <Filter className="w-4 h-4 text-slate-400" />
+                    <input 
+                        type="date" 
+                        value={scheduleFilterDate} 
+                        onChange={e => setScheduleFilterDate(e.target.value)}
+                        className="border rounded-lg p-1.5 text-sm focus:ring-2 focus:ring-indigo-500 bg-slate-50 border-slate-200"
+                    />
+                </div>
+                <select 
+                    value={scheduleFilterModality} 
+                    onChange={e => setScheduleFilterModality(e.target.value)}
+                    className="border border-slate-200 rounded-lg p-1.5 text-sm focus:ring-2 focus:ring-indigo-500 bg-slate-50 w-full md:w-48"
+                >
+                    <option value="all">Todas Modalidades</option>
+                    {modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+                
+                {selectedSessionIds.size > 0 && (
+                    <div className="md:ml-auto flex items-center gap-3 animate-in fade-in slide-in-from-right-2">
+                        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100">
+                            {selectedSessionIds.size} selecionados
+                        </span>
+                        <button 
+                            onClick={handleDeleteSelected}
+                            className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-600 flex items-center gap-1.5 shadow-sm"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" /> Excluir
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {showSessionForm && (
+              <div className="bg-white p-6 rounded-xl border-2 border-indigo-50 shadow-xl animate-in slide-in-from-top-4">
+                 <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-black text-indigo-900 flex items-center gap-2">
+                        {isBatchMode ? <><Copy className="w-5 h-5 text-indigo-600" /> Criação em Lote</> : <><Calendar className="w-5 h-5 text-indigo-600" /> Nova Aula Avulsa</>}
+                    </h3>
+                    <button onClick={() => setShowSessionForm(false)} className="text-slate-400 hover:text-slate-600"><X /></button>
+                 </div>
+
+                 {isBatchMode ? (
+                     <form onSubmit={handleBatchSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase">Modalidade</label>
+                                <select 
+                                    value={batchForm.modalityId} 
+                                    onChange={e => setBatchForm({...batchForm, modalityId: e.target.value})} 
+                                    className="w-full border rounded-lg p-2 text-sm" 
+                                    required
+                                >
+                                    <option value="">Selecione...</option>
+                                    {modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase">Professor</label>
+                                <select 
+                                    value={batchForm.instructor} 
+                                    onChange={e => setBatchForm({...batchForm, instructor: e.target.value})} 
+                                    className="w-full border rounded-lg p-2 text-sm" 
+                                    required
+                                    disabled={!batchForm.modalityId}
+                                >
+                                    <option value="">{batchForm.modalityId ? 'Selecionar...' : 'Escolha modalidade'}</option>
+                                    {teachers.filter(t => t.modalityId === batchForm.modalityId).map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase">Data Início</label>
+                                <input type="date" value={batchForm.startDate} onChange={e => setBatchForm({...batchForm, startDate: e.target.value})} className="w-full border rounded-lg p-2 text-sm" required />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase">Data Fim</label>
+                                <input type="date" value={batchForm.endDate} onChange={e => setBatchForm({...batchForm, endDate: e.target.value})} className="w-full border rounded-lg p-2 text-sm" required />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase">Dias da Semana</label>
+                            <div className="flex flex-wrap gap-2">
+                                {WEEK_DAYS.map(day => (
+                                    <button
+                                        key={day.val}
+                                        type="button"
+                                        onClick={() => {
+                                            const newDays = batchForm.daysOfWeek.includes(day.val) 
+                                                ? batchForm.daysOfWeek.filter(d => d !== day.val)
+                                                : [...batchForm.daysOfWeek, day.val];
+                                            setBatchForm({...batchForm, daysOfWeek: newDays});
+                                        }}
+                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${batchForm.daysOfWeek.includes(day.val) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`}
+                                    >
+                                        {day.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                             <label className="text-[10px] font-bold text-slate-400 uppercase">Horários (HH:mm)</label>
+                             <div className="flex flex-wrap gap-2 items-center">
+                                {batchForm.times.map((time, idx) => (
+                                    <div key={idx} className="flex items-center gap-1 bg-indigo-50 p-1 rounded-lg border border-indigo-100">
+                                        <input 
+                                            type="time" 
+                                            value={time} 
+                                            onChange={e => {
+                                                const newTimes = [...batchForm.times];
+                                                newTimes[idx] = e.target.value;
+                                                setBatchForm({...batchForm, times: newTimes});
+                                            }}
+                                            className="bg-transparent text-sm font-bold text-indigo-700 focus:outline-none"
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setBatchForm({...batchForm, times: batchForm.times.filter((_, i) => i !== idx)})}
+                                            className="text-indigo-300 hover:text-red-500"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button 
+                                    type="button" 
+                                    onClick={() => setBatchForm({...batchForm, times: [...batchForm.times, '08:00']})}
+                                    className="p-2 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
+                            <input type="number" value={batchForm.capacity} onChange={e => setBatchForm({...batchForm, capacity: parseInt(e.target.value)})} className="border rounded-lg p-2 text-sm" placeholder="Capacidade" required />
+                            <input type="text" value={batchForm.category} onChange={e => setBatchForm({...batchForm, category: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="Categoria (Iniciante, etc)" />
+                            <div className="flex gap-2">
+                                <button type="submit" disabled={formLoading} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
+                                    {formLoading ? 'Processando...' : 'Gerar Grade'}
+                                </button>
+                                <button type="button" onClick={() => setShowSessionForm(false)} className="px-4 py-2 bg-slate-100 text-slate-500 rounded-lg font-medium">Cancelar</button>
+                            </div>
+                        </div>
+                     </form>
+                 ) : (
+                     <form onSubmit={handleSessionSubmit} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <select value={sessionForm.modalityId} onChange={e => setSessionForm({...sessionForm, modalityId: e.target.value})} className="border rounded-lg p-2 text-sm" required>
+                                <option value="">Modalidade...</option>
+                                {modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                            <input type="date" value={sessionForm.date} onChange={e => setSessionForm({...sessionForm, date: e.target.value})} className="border rounded-lg p-2 text-sm" required />
+                            <input type="time" value={sessionForm.time} onChange={e => setSessionForm({...sessionForm, time: e.target.value})} className="border rounded-lg p-2 text-sm" required />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <select value={sessionForm.instructor} onChange={e => setSessionForm({...sessionForm, instructor: e.target.value})} className="border rounded-lg p-2 text-sm" required disabled={!sessionForm.modalityId}>
+                                <option value="">{sessionForm.modalityId ? 'Professor...' : 'Escolha modalidade'}</option>
+                                {teachers.filter(t => t.modalityId === sessionForm.modalityId).map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                            </select>
+                            <input type="number" value={sessionForm.capacity} onChange={e => setSessionForm({...sessionForm, capacity: parseInt(e.target.value)})} className="border rounded-lg p-2 text-sm" placeholder="Capacidade" required />
+                            <input type="text" value={sessionForm.category} onChange={e => setSessionForm({...sessionForm, category: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="Categoria" />
+                        </div>
+                        <div className="flex justify-end gap-2 border-t pt-4">
+                            <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-md">Adicionar Única</button>
+                            <button type="button" onClick={() => setShowSessionForm(false)} className="bg-slate-100 px-4 py-2 rounded-lg font-medium">Cancelar</button>
+                        </div>
+                     </form>
+                 )}
+              </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50 font-bold text-slate-500">
+                  <tr className="text-[10px] uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left w-12">
+                        <button onClick={selectAllFiltered} className="text-slate-400 hover:text-indigo-600 transition-colors">
+                            {selectedSessionIds.size === filteredScheduleSessions.length && filteredScheduleSessions.length > 0 ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                        </button>
+                    </th>
+                    <th className="px-6 py-4 text-left">Data/Hora</th>
+                    <th className="px-6 py-4 text-left">Modalidade</th>
+                    <th className="px-6 py-4 text-left">Instrutor</th>
+                    <th className="px-6 py-4 text-center">Vagas</th>
+                    <th className="px-6 py-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredScheduleSessions.map(s => {
+                    const m = modalities.find(mod => mod.id === s.modalityId);
+                    const isSelected = selectedSessionIds.has(s.id);
+                    return (
+                      <tr key={s.id} className={`hover:bg-slate-50 transition-colors text-sm ${isSelected ? 'bg-indigo-50/40' : ''}`}>
+                        <td className="px-6 py-4">
+                            <button onClick={() => toggleSessionSelection(s.id)} className={`transition-colors ${isSelected ? 'text-indigo-600' : 'text-slate-300 hover:text-indigo-400'}`}>
+                                {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                            </button>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-slate-700">{format(parseISO(s.startTime), 'dd/MM HH:mm')}</td>
+                        <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                                <span className="font-medium">{m?.name}</span>
+                                {s.category && <span className="text-[10px] text-slate-400 font-bold uppercase">{s.category}</span>}
+                            </div>
+                        </td>
+                        <td className="px-6 py-4 text-slate-500">{s.instructor}</td>
+                        <td className="px-6 py-4 text-center">
+                            <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{s.capacity}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button 
+                            onClick={() => openDeleteModal('session', s.id, 'Excluir Aula', `Deseja excluir a aula de ${m?.name} em ${format(parseISO(s.startTime), 'dd/MM HH:mm')}?`)} 
+                            className="text-slate-300 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {filteredScheduleSessions.length === 0 && (
+                <div className="p-12 text-center text-slate-400 bg-slate-50/50">
+                    <Calendar className="w-12 h-12 mx-auto mb-2 opacity-10" />
+                    <p>Nenhuma aula encontrada para os filtros aplicados.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'settings' && (
           <div className="max-w-2xl space-y-6">
              <h1 className="text-2xl font-bold text-slate-800">Configurações do Sistema</h1>
@@ -260,88 +542,6 @@ export const AdminPanel = () => {
           </div>
         )}
 
-        {activeTab === 'schedule' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h1 className="text-2xl font-bold text-slate-800">Grade Horária</h1>
-              <button onClick={() => setShowSessionForm(!showSessionForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 shadow-sm">
-                <Plus className="w-4 h-4" /> Nova Aula
-              </button>
-            </div>
-            {showSessionForm && (
-              <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2">
-                 <form onSubmit={handleSessionSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <select 
-                        value={sessionForm.modalityId} 
-                        onChange={e => setSessionForm({...sessionForm, modalityId: e.target.value, instructor: ''})} 
-                        className="border rounded-lg p-2" 
-                        required
-                    >
-                        <option value="">Modalidade...</option>
-                        {modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                    <input type="date" value={sessionForm.date} onChange={e => setSessionForm({...sessionForm, date: e.target.value})} className="border rounded-lg p-2" required />
-                    <input type="time" value={sessionForm.time} onChange={e => setSessionForm({...sessionForm, time: e.target.value})} className="border rounded-lg p-2" required />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <select 
-                        value={sessionForm.instructor} 
-                        onChange={e => setSessionForm({...sessionForm, instructor: e.target.value})} 
-                        className="border rounded-lg p-2" 
-                        required
-                        disabled={!sessionForm.modalityId}
-                    >
-                        <option value="">{sessionForm.modalityId ? 'Selecionar Professor...' : 'Escolha a modalidade primeiro'}</option>
-                        {availableTeachersForSession.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                    </select>
-                    <input type="number" value={sessionForm.capacity} onChange={e => setSessionForm({...sessionForm, capacity: parseInt(e.target.value)})} className="border rounded-lg p-2" placeholder="Capacidade" required />
-                    <input type="text" value={sessionForm.category} onChange={e => setSessionForm({...sessionForm, category: e.target.value})} className="border rounded-lg p-2" placeholder="Categoria" />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <button type="button" onClick={() => setShowSessionForm(false)} className="bg-slate-100 px-4 py-2 rounded-lg">Cancelar</button>
-                    <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold">Adicionar</button>
-                  </div>
-                 </form>
-              </div>
-            )}
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-              <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50 font-bold text-slate-500">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs uppercase">Data/Hora</th>
-                    <th className="px-6 py-4 text-left text-xs uppercase">Modalidade</th>
-                    <th className="px-6 py-4 text-left text-xs uppercase">Instrutor</th>
-                    <th className="px-6 py-4 text-center text-xs uppercase">Vagas</th>
-                    <th className="px-6 py-4 text-right text-xs uppercase">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {sessions.sort((a,b) => new Date(a.startTime) - new Date(b.startTime)).map(s => {
-                    const m = modalities.find(mod => mod.id === s.modalityId);
-                    return (
-                      <tr key={s.id} className="hover:bg-slate-50 text-sm">
-                        <td className="px-6 py-4 font-bold">{format(parseISO(s.startTime), 'dd/MM HH:mm')}</td>
-                        <td className="px-6 py-4">{m?.name}</td>
-                        <td className="px-6 py-4">{s.instructor}</td>
-                        <td className="px-6 py-4 text-center font-bold text-indigo-600">{s.capacity}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button 
-                            onClick={() => openDeleteModal('session', s.id, 'Excluir Aula', `Deseja excluir a aula de ${m?.name} com ${s.instructor} em ${format(parseISO(s.startTime), 'dd/MM HH:mm')}?`)} 
-                            className="text-red-400 hover:text-red-600"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {activeTab === 'teachers' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -361,11 +561,6 @@ export const AdminPanel = () => {
             </div>
             {showTeacherForm && (
               <div className={`bg-white p-6 rounded-xl border shadow-sm animate-in slide-in-from-top-2 ${editingTeacherId ? 'border-orange-200 ring-2 ring-orange-50' : 'border-indigo-100'}`}>
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                        {editingTeacherId ? <><Edit className="w-4 h-4 text-orange-500" /> Editar Professor</> : <><Plus className="w-4 h-4 text-indigo-500" /> Novo Professor</>}
-                    </h3>
-                </div>
                 <form onSubmit={handleTeacherSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
@@ -394,13 +589,7 @@ export const AdminPanel = () => {
                             {modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                         </select>
                     </div>
-                    {!editingTeacherId && (
-                      <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Senha Inicial</label>
-                          <input type="text" value={teacherForm.password} onChange={e => setTeacherForm({...teacherForm, password: e.target.value})} className="w-full border rounded-lg p-2 text-sm font-mono focus:ring-2 focus:ring-indigo-500" placeholder="Senha" required />
-                      </div>
-                    )}
-                    <div className={`flex gap-2 ${editingTeacherId ? 'md:col-span-2' : ''}`}>
+                    <div className="flex gap-2 md:col-span-2">
                         <button type="submit" disabled={formLoading} className={`${editingTeacherId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white px-4 py-2 rounded-lg text-sm font-bold flex-1 shadow-sm transition-colors`}>
                             {formLoading ? 'Processando...' : editingTeacherId ? 'Atualizar Dados' : 'Salvar Cadastro'}
                         </button>
@@ -435,16 +624,14 @@ export const AdminPanel = () => {
                                 <td className="px-6 py-4 text-right">
                                   <div className="flex justify-end gap-2">
                                       <button 
-                                        onClick={() => handleEditTeacherClick(t)} 
-                                        className="p-1.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                        title="Editar"
+                                        onClick={() => { setEditingTeacherId(t.id); setTeacherForm(t); setShowTeacherForm(true); }} 
+                                        className="p-1.5 text-indigo-400 hover:text-indigo-600"
                                       >
                                         <Edit className="w-4 h-4" />
                                       </button>
                                       <button 
                                         onClick={() => openDeleteModal('user', t.id, 'Desativar Professor', `Deseja realmente desativar o acesso do professor ${t.name}?`)} 
-                                        className="p-1.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                        title="Excluir"
+                                        className="p-1.5 text-red-300 hover:text-red-500"
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </button>
@@ -530,10 +717,6 @@ export const AdminPanel = () => {
                         ))}
                      </select>
                 </div>
-
-                <div className="md:ml-auto text-xs text-slate-400 flex items-center gap-1">
-                    <Info className="w-3 h-3" /> Clique em uma aula para detalhes.
-                </div>
             </div>
             
             <div className="space-y-4">
@@ -582,9 +765,6 @@ export const AdminPanel = () => {
                       
                       {isExpanded && (
                         <div className="border-t border-slate-100 animate-in slide-in-from-top-2">
-                          <div className="bg-slate-50 px-6 py-2 border-b border-slate-100 flex justify-between items-center">
-                            <h4 className="text-[10px] font-bold text-slate-400 uppercase">Participantes da Aula</h4>
-                          </div>
                           <div className="divide-y divide-slate-100">
                             {sessionBookings.length > 0 ? (
                               sessionBookings.map(b => {
@@ -606,13 +786,9 @@ export const AdminPanel = () => {
                                     </div>
                                     
                                     <div>
-                                      {isCancelled ? (
-                                        <span className="text-[10px] font-black uppercase text-red-500 flex items-center gap-1">
-                                          <UserX className="w-3 h-3" /> Cancelado
-                                        </span>
-                                      ) : (
+                                      {!isCancelled && (
                                         <button 
-                                          onClick={() => openDeleteModal('cancel_booking', b.id, 'Cancelar Reserva', `Deseja realmente remover a reserva do aluno ${student?.name}? A vaga será liberada imediatamente.`)}
+                                          onClick={() => openDeleteModal('cancel_booking', b.id, 'Cancelar Reserva', `Deseja realmente remover a reserva do aluno ${student?.name}?`)}
                                           className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 border border-red-100 hover:bg-red-600 hover:text-white transition-all shadow-sm"
                                         >
                                           <UserX className="w-3.5 h-3.5" /> Cancelar Aluno
@@ -633,17 +809,6 @@ export const AdminPanel = () => {
                     </div>
                   );
                 })}
-              
-              {sessions.filter(s => {
-                  const dateMatch = isSameDay(parseISO(s.startTime), parseISO(reportDate));
-                  const modalityMatch = reportModality === 'all' || s.modalityId === reportModality;
-                  return dateMatch && modalityMatch;
-              }).length === 0 && (
-                <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-slate-200 text-slate-400">
-                   <Calendar className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                   <p>Nenhuma aula encontrada para os filtros selecionados.</p>
-                </div>
-              )}
             </div>
           </div>
         )}
