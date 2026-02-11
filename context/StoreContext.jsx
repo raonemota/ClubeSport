@@ -365,10 +365,14 @@ export const StoreProvider = ({ children }) => {
     return bookings.filter(b => b.sessionId === sessionId && (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.ATTENDED)).length;
   };
 
+  const getWaitlistCount = (sessionId) => {
+    return bookings.filter(b => b.sessionId === sessionId && b.status === BookingStatus.WAITLIST).length;
+  };
+
   return (
     <StoreContext.Provider value={{
       currentUser, users, modalities, sessions, bookings, loading, bookingReleaseHour, notificationsEnabled,
-      login, logout, addSession, updateSession, addSessionsBatch, deleteSession, deleteSessions, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, updatePassword,
+      login, logout, addSession, updateSession, addSessionsBatch, deleteSession, deleteSessions, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, getWaitlistCount, updatePassword,
       updateBookingReleaseHour: (h) => setBookingReleaseHour(parseInt(h)),
       addModality: async (d) => { if (!supabase) setModalities([...modalities, {...d, id: Date.now().toString()}]); else await supabase.from('modalities').insert([{name: d.name, description: d.description, image_url: d.imageUrl}]); fetchData(); },
       updateModality: async (id, d) => { if (!supabase) setModalities(modalities.map(m => m.id === id ? {...m, ...d} : m)); else await supabase.from('modalities').update({name: d.name, description: d.description, image_url: d.imageUrl}).eq('id', id); fetchData(); },
@@ -405,7 +409,14 @@ export const StoreProvider = ({ children }) => {
             return true; 
           }
           const { error } = await supabase.from('bookings').insert([{session_id: sid, user_id: currentUser.id, status}]);
-          if (error) throw error;
+          if (error) {
+              console.error("Erro Supabase ao reservar:", error);
+              // Caso o banco falhe pelo constraint, avisamos o desenvolvedor
+              if (error.code === '23514') {
+                  alert("Erro de configuração no servidor (WAITLIST não permitido). Contate o suporte.");
+              }
+              throw error;
+          }
           await fetchData(); 
           return true;
         } catch (err) {

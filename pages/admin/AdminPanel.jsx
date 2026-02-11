@@ -14,7 +14,7 @@ export const AdminPanel = () => {
   const { 
     modalities, sessions, users, bookings, bookingReleaseHour, updateBookingReleaseHour,
     registerUser, updateUser, deleteUser, addModality, updateModality, deleteModality, addSession, updateSession, deleteSession,
-    cancelBooking, addSessionsBatch, deleteSessions, updateBookingStatus, getSessionBookingsCount
+    cancelBooking, addSessionsBatch, deleteSessions, updateBookingStatus, getSessionBookingsCount, getWaitlistCount
   } = useStore();
   
   const [activeTab, setActiveTab] = useState('reports');
@@ -423,6 +423,7 @@ export const AdminPanel = () => {
                         <tbody className="divide-y divide-slate-50">
                             {filteredScheduleSessions.map(s => {
                                 const currentCount = getSessionBookingsCount(s.id);
+                                const waitlistCount = getWaitlistCount(s.id);
                                 return (
                                 <tr key={s.id} className={`hover:bg-indigo-50/30 transition-colors ${selectedSessionIds.has(s.id) ? 'bg-indigo-50/50' : ''}`}>
                                     <td className="px-6 py-4">
@@ -442,9 +443,14 @@ export const AdminPanel = () => {
                                       <p className="text-[10px] text-indigo-400 font-bold uppercase mt-1">{s.instructor}</p>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                      <span className={`text-xs font-black px-3 py-1 rounded-full border ${currentCount >= s.capacity ? 'bg-red-50 text-red-600 border-red-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
-                                        {currentCount}/{s.capacity}
-                                      </span>
+                                      <div className="flex flex-col items-center">
+                                          <span className={`text-xs font-black px-3 py-1 rounded-full border ${currentCount >= s.capacity ? 'bg-red-50 text-red-600 border-red-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
+                                            {currentCount}/{s.capacity}
+                                          </span>
+                                          {waitlistCount > 0 && (
+                                              <span className="text-[9px] font-black text-orange-500 mt-1 uppercase">+{waitlistCount} na fila</span>
+                                          )}
+                                      </div>
                                     </td>
                                     <td className="px-6 py-4 text-right flex justify-end gap-2">
                                       <button onClick={() => { 

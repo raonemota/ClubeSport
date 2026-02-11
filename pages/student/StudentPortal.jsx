@@ -15,7 +15,7 @@ const getStatusColor = (current, max) => {
 };
 
 const DailyClassGroup = ({ date, modalityId, sessions, onBookSession }) => {
-    const { modalities, getSessionBookingsCount, bookings, currentUser, bookingReleaseHour } = useStore();
+    const { modalities, getSessionBookingsCount, getWaitlistCount, bookings, currentUser, bookingReleaseHour } = useStore();
     const modality = modalities.find(m => m.id === modalityId);
     const dateObj = new Date(sessions[0].startTime); 
     let dateLabel = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(dateObj);
@@ -48,6 +48,7 @@ const DailyClassGroup = ({ date, modalityId, sessions, onBookSession }) => {
                     <div className="space-y-2">
                         {sortedSessions.map(session => {
                             const currentBooked = getSessionBookingsCount(session.id);
+                            const waitlistCount = getWaitlistCount(session.id);
                             const isFull = currentBooked >= session.capacity;
                             const userBooking = bookings.find(b => b.sessionId === session.id && b.userId === currentUser?.id && b.status !== BookingStatus.CANCELLED);
                             const isBookedByUser = !!userBooking && userBooking.status === BookingStatus.CONFIRMED;
@@ -59,9 +60,16 @@ const DailyClassGroup = ({ date, modalityId, sessions, onBookSession }) => {
                                         <div className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-center min-w-[60px] font-black text-slate-800">{format(new Date(session.startTime), 'HH:mm')}</div>
                                         <div>
                                             <p className="text-sm font-bold text-slate-700 leading-tight">{session.instructor} {session.category && <span className="bg-indigo-100 text-indigo-700 text-[9px] px-1.5 rounded uppercase font-black ml-1">{session.category}</span>}</p>
-                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter ${getStatusColor(currentBooked, session.capacity)}`}>
-                                                {isFull ? 'ESGOTADO' : `${currentBooked}/${session.capacity} VAGAS`}
-                                            </span>
+                                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 mt-1">
+                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter w-fit ${getStatusColor(currentBooked, session.capacity)}`}>
+                                                    {isFull ? 'ESGOTADO' : `${currentBooked}/${session.capacity} VAGAS`}
+                                                </span>
+                                                {isFull && waitlistCount > 0 && (
+                                                    <span className="text-[8px] font-black text-orange-500 uppercase tracking-tighter flex items-center gap-0.5">
+                                                       <Timer className="w-2.5 h-2.5" /> {waitlistCount} na fila de espera
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <button 
