@@ -14,7 +14,7 @@ export const AdminPanel = () => {
   const { 
     modalities, sessions, users, bookings, bookingReleaseHour, updateBookingReleaseHour,
     registerUser, updateUser, deleteUser, addModality, updateModality, deleteModality, addSession, updateSession, deleteSession,
-    cancelBooking, addSessionsBatch, deleteSessions, updateBookingStatus
+    cancelBooking, addSessionsBatch, deleteSessions, updateBookingStatus, getSessionBookingsCount
   } = useStore();
   
   const [activeTab, setActiveTab] = useState('reports');
@@ -128,12 +128,23 @@ export const AdminPanel = () => {
   const handleSessionSubmit = async (e) => {
     e.preventDefault();
     setFormLoading(true);
-    const startTime = new Date(`${sessionForm.date}T${sessionForm.time}`).toISOString();
-    if (editingSessionId) await updateSession(editingSessionId, { ...sessionForm, startTime });
-    else await addSession({ ...sessionForm, startTime });
-    setFormLoading(false);
-    setShowSessionForm(false);
-    setEditingSessionId(null);
+    try {
+      const startTime = new Date(`${sessionForm.date}T${sessionForm.time}`).toISOString();
+      const payload = { ...sessionForm, startTime };
+      
+      if (editingSessionId) {
+        await updateSession(editingSessionId, payload);
+      } else {
+        await addSession(payload);
+      }
+      setShowSessionForm(false);
+      setEditingSessionId(null);
+      setSessionForm({ modalityId: '', instructor: '', date: '', time: '', durationMinutes: 60, capacity: 10, category: '' });
+    } catch (err) {
+      console.error("Erro ao salvar sessão:", err);
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   const toggleSessionSelection = (id) => {
@@ -174,11 +185,6 @@ export const AdminPanel = () => {
         </span>
       </button>
     );
-  };
-
-  const getSessionStats = (sessionId) => {
-      const confirmed = bookings.filter(b => b.sessionId === sessionId && b.status === BookingStatus.CONFIRMED).length;
-      return { total: confirmed };
   };
 
   const formatPhone = (value) => {
@@ -242,7 +248,7 @@ export const AdminPanel = () => {
            <div className="flex gap-2 w-full md:w-auto">
               {activeTab === 'schedule' && (
                 <button 
-                  onClick={() => { setShowSessionForm(true); setEditingSessionId(null); }} 
+                  onClick={() => { setShowSessionForm(true); setEditingSessionId(null); setSessionForm({ modalityId: '', instructor: '', date: '', time: '', durationMinutes: 60, capacity: 10, category: '' }); }} 
                   className="w-full md:w-auto bg-indigo-600 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg font-bold hover:bg-indigo-700 transition-all"
                 >
                   <Plus className="w-5 h-5" /> Configurar Grade
@@ -259,10 +265,12 @@ export const AdminPanel = () => {
           <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-2xl mb-8 relative animate-in slide-in-from-top-4">
               <button onClick={() => setShowSessionForm(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1"><X /></button>
               
-              <div className="flex bg-slate-100 p-1 rounded-xl w-fit mb-6">
-                  <button onClick={() => setIsBatchMode(false)} className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${!isBatchMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Aula Individual</button>
-                  <button onClick={() => setIsBatchMode(true)} className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${isBatchMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Criação em Lote</button>
-              </div>
+              {!editingSessionId && (
+                <div className="flex bg-slate-100 p-1 rounded-xl w-fit mb-6">
+                    <button onClick={() => setIsBatchMode(false)} className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${!isBatchMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Aula Individual</button>
+                    <button onClick={() => setIsBatchMode(true)} className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${isBatchMode ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Criação em Lote</button>
+                </div>
+              )}
 
               <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
                 {isBatchMode ? <><CalendarDays className="w-5 h-5 text-indigo-600"/> Planejamento Recorrente</> : <><Clock className="w-5 h-5 text-indigo-600"/> {editingSessionId ? 'Editar Sessão' : 'Nova Sessão Única'}</>}
@@ -413,7 +421,9 @@ export const AdminPanel = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {filteredScheduleSessions.map(s => (
+                            {filteredScheduleSessions.map(s => {
+                                const currentCount = getSessionBookingsCount(s.id);
+                                return (
                                 <tr key={s.id} className={`hover:bg-indigo-50/30 transition-colors ${selectedSessionIds.has(s.id) ? 'bg-indigo-50/50' : ''}`}>
                                     <td className="px-6 py-4">
                                       <button onClick={() => toggleSessionSelection(s.id)} className={selectedSessionIds.has(s.id) ? 'text-indigo-600' : 'text-slate-200'}>
@@ -432,14 +442,30 @@ export const AdminPanel = () => {
                                       <p className="text-[10px] text-indigo-400 font-bold uppercase mt-1">{s.instructor}</p>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                      <span className="text-xs font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full border border-indigo-100">{s.capacity}</span>
+                                      <span className={`text-xs font-black px-3 py-1 rounded-full border ${currentCount >= s.capacity ? 'bg-red-50 text-red-600 border-red-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
+                                        {currentCount}/{s.capacity}
+                                      </span>
                                     </td>
                                     <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                      <button onClick={() => { setEditingSessionId(s.id); setShowSessionForm(true); setIsBatchMode(false); setSessionForm({ modalityId: s.modalityId, instructor: s.instructor, date: format(parseISO(s.startTime), 'yyyy-MM-dd'), time: format(parseISO(s.startTime), 'HH:mm'), capacity: s.capacity, category: s.category || '' }); }} className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"><Edit className="w-4 h-4" /></button>
+                                      <button onClick={() => { 
+                                          setEditingSessionId(s.id); 
+                                          setShowSessionForm(true); 
+                                          setIsBatchMode(false); 
+                                          setSessionForm({ 
+                                            modalityId: s.modalityId, 
+                                            instructor: s.instructor, 
+                                            date: format(parseISO(s.startTime), 'yyyy-MM-dd'), 
+                                            time: format(parseISO(s.startTime), 'HH:mm'), 
+                                            capacity: s.capacity, 
+                                            category: s.category || '',
+                                            durationMinutes: s.duration_minutes || 60
+                                          }); 
+                                      }} className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"><Edit className="w-4 h-4" /></button>
                                       <button onClick={() => openDeleteModal('session', s.id, 'Excluir Aula', 'Deseja remover esta aula da grade permanentemente?')} className="p-2 text-slate-300 hover:text-red-500 hover:bg-white rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -571,9 +597,9 @@ export const AdminPanel = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {sessions.filter(s => isSameDay(parseISO(s.startTime), parseISO(reportDate)) && (reportModality === 'all' || s.modalityId === reportModality)).sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()).map(s => {
-                  const stats = getSessionStats(s.id);
+                  const stats = getSessionBookingsCount(s.id);
                   const isExpanded = expandedSessionId === s.id;
-                  const confirmedBookings = bookings.filter(b => b.sessionId === s.id && b.status !== BookingStatus.WAITLIST);
+                  const confirmedBookings = bookings.filter(b => b.sessionId === s.id && (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.ATTENDED));
                   return (
                     <div key={s.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                       <div onClick={() => setExpandedSessionId(isExpanded ? null : s.id)} className={`p-4 flex items-center justify-between cursor-pointer transition-colors ${isExpanded ? 'bg-indigo-50/50' : 'hover:bg-slate-50'}`}>
@@ -586,7 +612,7 @@ export const AdminPanel = () => {
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="text-right">
-                            <p className="text-lg font-black text-indigo-600 leading-none">{stats.total}/{s.capacity}</p>
+                            <p className="text-lg font-black text-indigo-600 leading-none">{stats}/{s.capacity}</p>
                             <p className="text-[8px] font-black text-slate-400 uppercase mt-0.5">Alunos</p>
                           </div>
                           {isExpanded ? <ChevronUp className="w-5 h-5 text-indigo-600" /> : <ChevronDown className="w-5 h-5 text-slate-300" />}

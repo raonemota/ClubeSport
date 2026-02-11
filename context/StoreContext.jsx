@@ -205,12 +205,12 @@ export const StoreProvider = ({ children }) => {
         modality_id: data.modalityId,
         instructor: data.instructor,
         start_time: data.startTime,
-        duration_minutes: data.durationMinutes,
+        duration_minutes: data.durationMinutes || 60,
         capacity: data.capacity,
         category: data.category
       }]);
     }
-    fetchData();
+    await fetchData();
   };
 
   const updateSession = async (id, data) => {
@@ -221,12 +221,12 @@ export const StoreProvider = ({ children }) => {
         modality_id: data.modalityId,
         instructor: data.instructor,
         start_time: data.startTime,
-        duration_minutes: data.duration_minutes,
+        duration_minutes: data.durationMinutes || 60,
         capacity: data.capacity,
         category: data.category
       }).eq('id', id);
     }
-    fetchData();
+    await fetchData();
   };
 
   const addSessionsBatch = async (batchData) => {
@@ -287,7 +287,6 @@ export const StoreProvider = ({ children }) => {
       return;
     }
     
-    // Busca o próximo da fila
     const { data: nextInLine } = await supabase
       .from('bookings')
       .select('*')
@@ -336,7 +335,6 @@ export const StoreProvider = ({ children }) => {
         if (error) throw error;
       }
 
-      // Se o status mudou de CONFIRMED para algo que libera vaga, promove o próximo
       if (booking && booking.status === BookingStatus.CONFIRMED && 
           (status === BookingStatus.CANCELLED || status === BookingStatus.MISSED)) {
           await promoteFromWaitlist(booking.sessionId);
@@ -345,7 +343,6 @@ export const StoreProvider = ({ children }) => {
       await fetchData();
     } catch (err) {
       console.error("Erro ao atualizar status da reserva:", err);
-      alert("Erro ao salvar no banco de dados. Verifique a conexão.");
     }
   };
 
@@ -365,7 +362,7 @@ export const StoreProvider = ({ children }) => {
   };
 
   const getSessionBookingsCount = (sessionId) => {
-    return bookings.filter(b => b.sessionId === sessionId && b.status === BookingStatus.CONFIRMED).length;
+    return bookings.filter(b => b.sessionId === sessionId && (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.ATTENDED)).length;
   };
 
   return (
@@ -427,7 +424,6 @@ export const StoreProvider = ({ children }) => {
             if (error) throw error;
           }
 
-          // Se cancelou uma vaga confirmada, promove o próximo da fila
           if (booking && booking.status === BookingStatus.CONFIRMED) {
               await promoteFromWaitlist(booking.sessionId);
           }
@@ -435,7 +431,6 @@ export const StoreProvider = ({ children }) => {
           await fetchData();
         } catch (err) {
           console.error("Erro ao cancelar reserva:", err);
-          alert("Erro ao cancelar a reserva no servidor.");
         }
       }
     }}>
