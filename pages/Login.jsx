@@ -1,24 +1,26 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { UserRole } from '../types.js';
-import { Trophy, Lock, Mail, Info } from 'lucide-react';
+import { Trophy, Lock, Mail, Info, Loader2 } from 'lucide-react';
 
 export const Login = () => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loginProcessLoading, setLoginProcessLoading] = useState(false);
   
-  const { login, currentUser } = useStore();
+  const { login, currentUser, loading: storeLoading } = useStore();
   const navigate = useNavigate();
 
-  // Redirect if already logged in
+  // Redirect if already logged in and NOT in a loading state
   React.useEffect(() => {
-    if (currentUser) {
-      navigate(currentUser.role === UserRole.ADMIN ? '/admin' : '/student');
+    if (currentUser && !storeLoading) {
+      const dest = currentUser.role === UserRole.ADMIN ? '/admin' : currentUser.role === UserRole.TEACHER ? '/teacher' : '/student';
+      navigate(dest, { replace: true });
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, storeLoading, navigate]);
 
   const handleIdentifierChange = (e) => {
     let value = e.target.value;
@@ -47,7 +49,7 @@ export const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+    setLoginProcessLoading(true);
     
     try {
       const success = await login(identifier, password);
@@ -57,9 +59,17 @@ export const Login = () => {
     } catch (err) {
       setError('Erro ao conectar ao servidor.');
     } finally {
-      setLoading(false);
+      setLoginProcessLoading(false);
     }
   };
+
+  if (storeLoading) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -115,10 +125,10 @@ export const Login = () => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loginProcessLoading}
             className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-50"
           >
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loginProcessLoading ? 'Entrando...' : 'Entrar'}
           </button>
 
           <div className="mt-4 bg-indigo-50 rounded-lg p-4 border border-indigo-100">

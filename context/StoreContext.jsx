@@ -60,7 +60,7 @@ export const StoreProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (isUpdatingPassword.current) return;
 
-      if (event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         setCurrentUser(null);
         setLoading(false);
       } else if (session) {
@@ -123,7 +123,19 @@ export const StoreProvider = ({ children }) => {
     return !error;
   };
 
-  const logout = async () => { if (supabase) await supabase.auth.signOut(); setCurrentUser(null); };
+  const logout = async () => { 
+    setLoading(true);
+    try {
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+    } finally {
+      setCurrentUser(null);
+      setLoading(false);
+    }
+  };
 
   const registerUser = async (userData, role = UserRole.STUDENT) => {
     if (!supabase) { 
@@ -160,6 +172,59 @@ export const StoreProvider = ({ children }) => {
       setCurrentUser({ ...currentUser, mustChangePassword: false });
       setTimeout(() => { isUpdatingPassword.current = false; }, 3000);
       return true;
+  };
+
+  const addSession = async (data) => {
+    if (!supabase) {
+      setSessions([...sessions, { ...data, id: Date.now().toString() }]);
+    } else {
+      await supabase.from('class_sessions').insert([{
+        modality_id: data.modalityId,
+        instructor: data.instructor,
+        start_time: data.startTime,
+        duration_minutes: data.durationMinutes,
+        capacity: data.capacity,
+        category: data.category
+      }]);
+    }
+    fetchData();
+  };
+
+  const deleteSession = async (id) => {
+    if (!supabase) setSessions(sessions.filter(s => s.id !== id));
+    else await supabase.from('class_sessions').delete().eq('id', id);
+    fetchData();
+  };
+
+  const deleteModality = async (id) => {
+    if (!supabase) setModalities(modalities.filter(m => m.id !== id));
+    else await supabase.from('modalities').delete().eq('id', id);
+    fetchData();
+  };
+
+  const updateBookingStatus = async (id, status) => {
+    if (!supabase) setBookings(bookings.map(b => b.id === id ? { ...b, status } : b));
+    else await supabase.from('bookings').update({ status }).eq('id', id);
+    fetchData();
+  };
+
+  const getStudentStats = (userId) => {
+    const userBookings = bookings.filter(b => b.userId === userId);
+    return {
+      total: userBookings.length,
+      attended: userBookings.filter(b => b.status === BookingStatus.ATTENDED).length,
+      missed: userBookings.filter(b => b.status === BookingStatus.MISSED).length,
+      upcoming: userBookings.filter(b => b.status === BookingStatus.CONFIRMED).length
+    };
+  };
+
+  const requestNotificationPermission = async () => {
+    const permission = await Notification.requestPermission();
+    setNotificationsEnabled(permission === 'granted');
+  };
+
+  const getSessionBookingsCount = (sessionId) => {
+    return bookings.filter(b => b.sessionId === sessionId && b.status === BookingStatus.CONFIRMED).length;
   };
 
   return (

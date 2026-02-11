@@ -2,14 +2,19 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { UserRole } from '../types.js';
-import { LogOut, User as UserIcon, Trophy, ClipboardCheck } from 'lucide-react';
+import { LogOut, User as UserIcon, Trophy, ClipboardCheck, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export const Navbar = () => {
-  const { currentUser, logout } = useStore();
+  const { currentUser, logout, loading } = useStore();
   const navigate = useNavigate();
 
   if (!currentUser) return null;
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/', { replace: true });
+  };
 
   const roleLabels = {
     [UserRole.ADMIN]: 'Administrador',
@@ -52,16 +57,17 @@ export const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex flex-col items-end leading-none mr-2">
-              <span className="font-medium text-sm">{currentUser.name}</span>
+            <div className="flex flex-col items-end leading-none mr-2 text-right">
+              <span className="font-medium text-sm block truncate max-w-[120px]">{currentUser.name}</span>
               <span className="text-[10px] text-indigo-400 uppercase font-bold tracking-tighter">{roleLabels[currentUser.role]}</span>
             </div>
             <button
-              onClick={() => { logout(); navigate('/'); }}
-              className="bg-slate-800 hover:bg-red-600 p-2 rounded-full text-white transition-all shadow-inner"
+              onClick={handleLogout}
+              disabled={loading}
+              className="bg-slate-800 hover:bg-red-600 p-2 rounded-full text-white transition-all shadow-inner disabled:opacity-50"
               title="Sair"
             >
-              <LogOut className="w-4 h-4" />
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
             </button>
           </div>
         </div>
