@@ -79,6 +79,13 @@ const MyBookingCard = ({ session, bookingId, bookedAt, status, onRequestCancel }
   const isCancelled = status.includes('CANCELLED');
   const cancelledByAdmin = status === 'CANCELLED_BY_ADMIN';
 
+  // Usando Intl nativo para evitar erros de locale no date-fns
+  const formattedDate = new Intl.DateTimeFormat('pt-BR', { 
+    weekday: 'long', 
+    day: '2-digit', 
+    month: '2-digit' 
+  }).format(date);
+
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden ${isCancelled ? 'opacity-70 bg-gray-50/50' : ''}`}>
       <div className="h-24 bg-gray-200 relative">
@@ -98,7 +105,7 @@ const MyBookingCard = ({ session, bookingId, bookedAt, status, onRequestCancel }
       <div className="p-4">
           <div className="flex justify-between items-start mb-2">
               <div>
-                  <p className="text-indigo-600 text-xs font-bold uppercase">{format(date, "EEEE, dd/MM", { locale: { code: 'pt-BR' } })}</p>
+                  <p className="text-indigo-600 text-xs font-bold uppercase capitalize">{formattedDate}</p>
                   <h3 className={`text-2xl font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{format(date, 'HH:mm')}</h3>
               </div>
           </div>

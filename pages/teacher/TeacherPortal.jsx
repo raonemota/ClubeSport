@@ -23,6 +23,13 @@ export const TeacherPortal = () => {
     await updateBookingStatus(bookingId, status);
   };
 
+  // Usando Intl para formatar a data do topo
+  const formattedHeaderDate = new Intl.DateTimeFormat('pt-BR', { 
+    weekday: 'long', 
+    day: '2-digit', 
+    month: '2-digit' 
+  }).format(viewDate);
+
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 bg-slate-50 min-h-screen">
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -32,7 +39,7 @@ export const TeacherPortal = () => {
         </div>
         <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
            <button onClick={() => setViewDate(addDays(viewDate, -1))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors"><ChevronLeft /></button>
-           <span className="font-bold text-slate-700 min-w-[140px] text-center capitalize">{format(viewDate, "EEEE, dd/MM", { locale: { code: 'pt-BR' } })}</span>
+           <span className="font-bold text-slate-700 min-w-[140px] text-center capitalize">{formattedHeaderDate}</span>
            <button onClick={() => setViewDate(addDays(viewDate, 1))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors"><ChevronRight /></button>
         </div>
       </div>
