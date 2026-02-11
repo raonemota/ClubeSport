@@ -69,7 +69,7 @@ export const AdminPanel = () => {
     if (type === 'session') await deleteSession(id);
     else if (type === 'modality') await deleteModality(id);
     else if (type === 'user') await deleteUser(id);
-    else if (type === 'cancel_booking') await cancelBooking(id, true);
+    else if (type === 'cancel_booking') await cancelBooking(id);
     
     setDeleteModal({ isOpen: false, type: null, id: null, title: '', message: '' });
   };
@@ -152,7 +152,7 @@ export const AdminPanel = () => {
 
   const getSessionStats = (sessionId) => {
       const sessionBookings = bookings.filter(b => b.sessionId === sessionId && b.status === BookingStatus.CONFIRMED);
-      const totalCancelled = bookings.filter(b => b.sessionId === sessionId && b.status.includes('CANCELLED')).length;
+      const totalCancelled = bookings.filter(b => b.sessionId === sessionId && b.status === BookingStatus.CANCELLED).length;
       return { total: sessionBookings.length, cancelled: totalCancelled };
   };
 
@@ -565,7 +565,7 @@ export const AdminPanel = () => {
                             {sessionBookings.length > 0 ? (
                               sessionBookings.map(b => {
                                 const student = users.find(u => u.id === b.userId);
-                                const isCancelled = b.status.includes('CANCELLED');
+                                const isCancelled = b.status === BookingStatus.CANCELLED;
                                 return (
                                   <div key={b.id} className={`px-6 py-3 flex items-center justify-between ${isCancelled ? 'bg-red-50/20 grayscale opacity-60' : 'hover:bg-indigo-50/30'}`}>
                                     <div className="flex items-center gap-3">
@@ -584,7 +584,7 @@ export const AdminPanel = () => {
                                     <div>
                                       {isCancelled ? (
                                         <span className="text-[10px] font-black uppercase text-red-500 flex items-center gap-1">
-                                          <UserX className="w-3 h-3" /> {b.status === BookingStatus.CANCELLED_BY_ADMIN ? 'Cancelado pela Admin' : 'Cancelado pelo Aluno'}
+                                          <UserX className="w-3 h-3" /> Cancelado
                                         </span>
                                       ) : (
                                         <button 

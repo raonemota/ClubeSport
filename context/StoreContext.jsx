@@ -95,14 +95,21 @@ export const StoreProvider = ({ children }) => {
 
   const fetchData = async () => {
     if (!supabase) return;
-    const { data: mods } = await supabase.from('modalities').select('*');
-    if (mods) setModalities(mods.map(m => ({ id: m.id, name: m.name, description: m.description, imageUrl: m.image_url })));
-    const { data: sess } = await supabase.from('class_sessions').select('*');
-    if (sess) setSessions(sess.map(s => ({ id: s.id, modalityId: s.modality_id, instructor: s.instructor, startTime: s.start_time, duration_minutes: s.duration_minutes, capacity: s.capacity, category: s.category })));
-    const { data: bks } = await supabase.from('bookings').select('*');
-    if (bks) setBookings(bks.map(b => ({ id: b.id, sessionId: b.session_id, userId: b.user_id, status: b.status, bookedAt: b.booked_at })));
-    const { data: usrs } = await supabase.from('profiles').select('*');
-    if (usrs) setUsers(usrs.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, planType: u.plan_type, modalityId: u.modality_id, observation: u.observation, must_change_password: u.must_change_password })));
+    try {
+      const { data: mods } = await supabase.from('modalities').select('*');
+      if (mods) setModalities(mods.map(m => ({ id: m.id, name: m.name, description: m.description, imageUrl: m.image_url })));
+      
+      const { data: sess } = await supabase.from('class_sessions').select('*');
+      if (sess) setSessions(sess.map(s => ({ id: s.id, modalityId: s.modality_id, instructor: s.instructor, startTime: s.start_time, durationMinutes: s.duration_minutes, capacity: s.capacity, category: s.category })));
+      
+      const { data: bks } = await supabase.from('bookings').select('*');
+      if (bks) setBookings(bks.map(b => ({ id: b.id, sessionId: b.session_id, userId: b.user_id, status: b.status, bookedAt: b.booked_at })));
+      
+      const { data: usrs } = await supabase.from('profiles').select('*');
+      if (usrs) setUsers(usrs.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, planType: u.plan_type, modalityId: u.modality_id, observation: u.observation, mustChangePassword: u.must_change_password })));
+    } catch (err) {
+      console.error("Erro ao carregar dados do banco:", err);
+    }
   };
 
   const login = async (identifier, pass) => {
@@ -211,9 +218,18 @@ export const StoreProvider = ({ children }) => {
   };
 
   const updateBookingStatus = async (id, status) => {
-    if (!supabase) setBookings(bookings.map(b => b.id === id ? { ...b, status } : b));
-    else await supabase.from('bookings').update({ status }).eq('id', id);
-    fetchData();
+    try {
+      if (!supabase) {
+        setBookings(bookings.map(b => b.id === id ? { ...b, status } : b));
+      } else {
+        const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
+        if (error) throw error;
+      }
+      await fetchData();
+    } catch (err) {
+      console.error("Erro ao atualizar status da reserva:", err);
+      alert("Erro ao salvar no banco de dados. Verifique a conexão.");
+    }
   };
 
   const getStudentStats = (userId) => {
@@ -263,14 +279,34 @@ export const StoreProvider = ({ children }) => {
       deleteUser: async (id) => { if (!supabase) setUsers(users.filter(u => u.id !== id)); else await supabase.from('profiles').update({role: UserRole.INACTIVE}).eq('id', id); fetchData(); },
       bookSession: async (sid) => { 
         if (!currentUser) return false;
-        if (!supabase) { setBookings([...bookings, {id: Date.now().toString(), sessionId: sid, userId: currentUser.id, status: BookingStatus.CONFIRMED, bookedAt: new Date().toISOString()}]); return true; }
-        await supabase.from('bookings').insert([{session_id: sid, user_id: currentUser.id, status: BookingStatus.CONFIRMED}]); fetchData(); return true;
+        try {
+          if (!supabase) { 
+            setBookings([...bookings, {id: Date.now().toString(), sessionId: sid, userId: currentUser.id, status: BookingStatus.CONFIRMED, bookedAt: new Date().toISOString()}]); 
+            return true; 
+          }
+          const { error } = await supabase.from('bookings').insert([{session_id: sid, user_id: currentUser.id, status: BookingStatus.CONFIRMED}]);
+          if (error) throw error;
+          await fetchData(); 
+          return true;
+        } catch (err) {
+          console.error("Erro ao reservar aula:", err);
+          return false;
+        }
       },
-      cancelBooking: async (bid, isAdmin) => {
-        const status = isAdmin ? BookingStatus.CANCELLED_BY_ADMIN : BookingStatus.CANCELLED_BY_STUDENT;
-        if (!supabase) setBookings(bookings.map(b => b.id === bid ? {...b, status} : b));
-        else await supabase.from('bookings').update({status}).eq('id', bid);
-        fetchData();
+      cancelBooking: async (bid) => {
+        try {
+          const status = BookingStatus.CANCELLED;
+          if (!supabase) {
+            setBookings(bookings.map(b => b.id === bid ? {...b, status} : b));
+          } else {
+            const { error } = await supabase.from('bookings').update({ status }).eq('id', bid);
+            if (error) throw error;
+          }
+          await fetchData();
+        } catch (err) {
+          console.error("Erro ao cancelar reserva:", err);
+          alert("Erro ao cancelar a reserva no servidor (400 Bad Request). Verifique se o status 'CANCELLED' é aceito.");
+        }
       }
     }}>
       {children}
