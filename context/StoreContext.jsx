@@ -87,7 +87,7 @@ export const StoreProvider = ({ children }) => {
            setCurrentUser(null);
            return;
         }
-        setCurrentUser({ ...data, planType: data.plan_type, mustChangePassword: data.must_change_password });
+        setCurrentUser({ ...data, planType: data.plan_type, modalityId: data.modality_id, mustChangePassword: data.must_change_password });
       }
     } catch (error) { console.error(error); } 
     finally { setLoading(false); }
@@ -102,7 +102,7 @@ export const StoreProvider = ({ children }) => {
     const { data: bks } = await supabase.from('bookings').select('*');
     if (bks) setBookings(bks.map(b => ({ id: b.id, sessionId: b.session_id, userId: b.user_id, status: b.status, bookedAt: b.booked_at })));
     const { data: usrs } = await supabase.from('profiles').select('*');
-    if (usrs) setUsers(usrs.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, planType: u.plan_type, observation: u.observation, must_change_password: u.must_change_password })));
+    if (usrs) setUsers(usrs.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, planType: u.plan_type, modalityId: u.modality_id, observation: u.observation, must_change_password: u.must_change_password })));
   };
 
   const login = async (identifier, pass) => {
@@ -150,7 +150,15 @@ export const StoreProvider = ({ children }) => {
       const { data: authData, error: authError } = await tempClient.auth.signUp({ email: userData.email, password: userData.password });
       if (authError) return { success: false, error: authError.message };
       const newUserId = authData.user?.id;
-      const payload = { id: newUserId, email: userData.email, name: userData.name, phone: userData.phone, role: role, must_change_password: true };
+      const payload = { 
+        id: newUserId, 
+        email: userData.email, 
+        name: userData.name, 
+        phone: userData.phone, 
+        role: role, 
+        modality_id: userData.modalityId || null,
+        must_change_password: true 
+      };
       const { error: profileError } = await supabase.from('profiles').insert([payload]);
       await fetchData(); 
       return { success: true };
@@ -233,7 +241,24 @@ export const StoreProvider = ({ children }) => {
       login, logout, addSession, deleteSession, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, updatePassword,
       updateBookingReleaseHour: (h) => setBookingReleaseHour(parseInt(h)),
       addModality: async (d) => { if (!supabase) setModalities([...modalities, {...d, id: Date.now().toString()}]); else await supabase.from('modalities').insert([{name: d.name, description: d.description, image_url: d.imageUrl}]); fetchData(); },
-      updateUser: async (id, upd) => { if (!supabase) setUsers(users.map(u => u.id === id ? {...u, ...upd} : u)); else await supabase.from('profiles').update({name: upd.name, phone: upd.phone, plan_type: upd.planType, role: upd.role}).eq('id', id); fetchData(); },
+      updateUser: async (id, upd) => { 
+        if (!supabase) {
+          setUsers(users.map(u => u.id === id ? {...u, ...upd} : u));
+          if (currentUser?.id === id) setCurrentUser({...currentUser, ...upd});
+        } else {
+          const payload = {};
+          if (upd.name !== undefined) payload.name = upd.name;
+          if (upd.phone !== undefined) payload.phone = upd.phone;
+          if (upd.planType !== undefined) payload.plan_type = upd.planType;
+          if (upd.role !== undefined) payload.role = upd.role;
+          if (upd.modalityId !== undefined) payload.modality_id = upd.modalityId;
+          
+          await supabase.from('profiles').update(payload).eq('id', id);
+          if (currentUser?.id === id) await fetchUserProfile(id);
+        }
+        await fetchData(); 
+        return true;
+      },
       deleteUser: async (id) => { if (!supabase) setUsers(users.filter(u => u.id !== id)); else await supabase.from('profiles').update({role: UserRole.INACTIVE}).eq('id', id); fetchData(); },
       bookSession: async (sid) => { 
         if (!currentUser) return false;

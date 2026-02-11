@@ -4,6 +4,7 @@ import { useStore } from '../../context/StoreContext';
 import { Plus, Trash2, Calendar, Dumbbell, Users, X, FileText, GraduationCap, Phone, Mail, Clock, Filter, Save, Info, AlertCircle, ShieldCheck, Key, Settings } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { UserRole, BookingStatus } from '../../types.js';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
 
 export const AdminPanel = () => {
   const { 
@@ -16,7 +17,7 @@ export const AdminPanel = () => {
   // States para Formulários
   const [showTeacherForm, setShowTeacherForm] = useState(false);
   const [showStudentForm, setShowStudentForm] = useState(false);
-  const [teacherForm, setTeacherForm] = useState({ name: '', phone: '', email: '', password: 'mudar@123' });
+  const [teacherForm, setTeacherForm] = useState({ name: '', phone: '', email: '', password: 'mudar@123', modalityId: '' });
   const [studentForm, setStudentForm] = useState({ name: '', phone: '', email: '', password: 'mudar@123', planType: 'Mensalista' });
   const [formLoading, setFormLoading] = useState(false);
   
@@ -29,8 +30,20 @@ export const AdminPanel = () => {
   const [reportSubTab, setReportSubTab] = useState('attendance');
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // Estado para Modal de Confirmação
+  const [deleteModal, setDeleteModal] = useState({ 
+    isOpen: false, 
+    type: null, 
+    id: null, 
+    title: '', 
+    message: '' 
+  });
+
   const teachers = users.filter(u => u.role === UserRole.TEACHER);
   const students = users.filter(u => u.role === UserRole.STUDENT);
+
+  // Filtrar professores baseados na modalidade selecionada no formulário de aula
+  const availableTeachersForSession = teachers.filter(t => t.modalityId === sessionForm.modalityId);
 
   const formatPhone = (value) => {
     value = value.replace(/\D/g, "");
@@ -42,13 +55,30 @@ export const AdminPanel = () => {
     return value;
   };
 
+  const openDeleteModal = (type, id, title, message) => {
+    setDeleteModal({ isOpen: true, type, id, title, message });
+  };
+
+  const handleConfirmDelete = async () => {
+    const { type, id } = deleteModal;
+    if (type === 'session') await deleteSession(id);
+    else if (type === 'modality') await deleteModality(id);
+    else if (type === 'user') await deleteUser(id);
+    
+    setDeleteModal({ isOpen: false, type: null, id: null, title: '', message: '' });
+  };
+
   const handleTeacherSubmit = async (e) => {
     e.preventDefault();
+    if (!teacherForm.modalityId) {
+        alert("Selecione uma modalidade para o professor.");
+        return;
+    }
     setFormLoading(true);
     const result = await registerUser(teacherForm, UserRole.TEACHER);
     if (result.success) {
       alert(`Professor cadastrado com sucesso!`);
-      setTeacherForm({ name: '', phone: '', email: '', password: 'mudar@123' });
+      setTeacherForm({ name: '', phone: '', email: '', password: 'mudar@123', modalityId: '' });
       setShowTeacherForm(false);
     }
     setFormLoading(false);
@@ -98,6 +128,14 @@ export const AdminPanel = () => {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
+      <ConfirmationModal 
+        isOpen={deleteModal.isOpen} 
+        onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })} 
+        onConfirm={handleConfirmDelete}
+        title={deleteModal.title}
+        message={deleteModal.message}
+      />
+
       <aside className="w-full md:w-64 bg-white border-r border-gray-200 p-6 space-y-2">
         <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Administrativo</h2>
         <NavButton tabId="reports" icon={FileText} label="Relatórios" />
@@ -175,7 +213,12 @@ export const AdminPanel = () => {
                 <div key={modality.id} className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col group">
                   <div className="h-32 bg-slate-200 relative">
                     {modality.imageUrl && <img src={modality.imageUrl} className="w-full h-full object-cover" />}
-                    <button onClick={() => deleteModality(modality.id)} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => openDeleteModal('modality', modality.id, 'Excluir Modalidade', `Tem certeza que deseja excluir a modalidade "${modality.name}"? Isso pode afetar aulas agendadas.`)} 
+                      className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                   <div className="p-4"><h3 className="font-bold">{modality.name}</h3></div>
                 </div>
@@ -196,7 +239,12 @@ export const AdminPanel = () => {
               <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2">
                  <form onSubmit={handleSessionSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <select value={sessionForm.modalityId} onChange={e => setSessionForm({...sessionForm, modalityId: e.target.value})} className="border rounded-lg p-2" required>
+                    <select 
+                        value={sessionForm.modalityId} 
+                        onChange={e => setSessionForm({...sessionForm, modalityId: e.target.value, instructor: ''})} 
+                        className="border rounded-lg p-2" 
+                        required
+                    >
                         <option value="">Modalidade...</option>
                         {modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                     </select>
@@ -204,7 +252,16 @@ export const AdminPanel = () => {
                     <input type="time" value={sessionForm.time} onChange={e => setSessionForm({...sessionForm, time: e.target.value})} className="border rounded-lg p-2" required />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <input type="text" value={sessionForm.instructor} onChange={e => setSessionForm({...sessionForm, instructor: e.target.value})} className="border rounded-lg p-2" placeholder="Instrutor" required />
+                    <select 
+                        value={sessionForm.instructor} 
+                        onChange={e => setSessionForm({...sessionForm, instructor: e.target.value})} 
+                        className="border rounded-lg p-2" 
+                        required
+                        disabled={!sessionForm.modalityId}
+                    >
+                        <option value="">{sessionForm.modalityId ? 'Selecionar Professor...' : 'Escolha a modalidade primeiro'}</option>
+                        {availableTeachersForSession.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                    </select>
                     <input type="number" value={sessionForm.capacity} onChange={e => setSessionForm({...sessionForm, capacity: parseInt(e.target.value)})} className="border rounded-lg p-2" placeholder="Capacidade" required />
                     <input type="text" value={sessionForm.category} onChange={e => setSessionForm({...sessionForm, category: e.target.value})} className="border rounded-lg p-2" placeholder="Categoria" />
                   </div>
@@ -235,7 +292,14 @@ export const AdminPanel = () => {
                         <td className="px-6 py-4">{m?.name}</td>
                         <td className="px-6 py-4">{s.instructor}</td>
                         <td className="px-6 py-4 text-center font-bold text-indigo-600">{s.capacity}</td>
-                        <td className="px-6 py-4 text-right"><button onClick={() => deleteSession(s.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></td>
+                        <td className="px-6 py-4 text-right">
+                          <button 
+                            onClick={() => openDeleteModal('session', s.id, 'Excluir Aula', `Deseja excluir a aula de ${m?.name} com ${s.instructor} em ${format(parseISO(s.startTime), 'dd/MM HH:mm')}?`)} 
+                            className="text-red-400 hover:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -253,14 +317,27 @@ export const AdminPanel = () => {
             </div>
             {showTeacherForm && (
               <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2">
-                <form onSubmit={handleTeacherSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <input type="text" value={teacherForm.name} onChange={e => setTeacherForm({...teacherForm, name: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="Nome" required />
-                  <input type="email" value={teacherForm.email} onChange={e => setTeacherForm({...teacherForm, email: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="E-mail" required />
-                  <input type="text" value={teacherForm.phone} onChange={e => setTeacherForm({...teacherForm, phone: formatPhone(e.target.value)})} className="border rounded-lg p-2 text-sm" placeholder="Telefone" required />
-                  <input type="text" value={teacherForm.password} onChange={e => setTeacherForm({...teacherForm, password: e.target.value})} className="border rounded-lg p-2 text-sm font-mono" required />
-                  <div className="flex gap-2">
-                    <button type="submit" disabled={formLoading} className="bg-indigo-600 text-white px-4 rounded-lg text-sm font-bold flex-1">{formLoading ? '...' : 'Salvar'}</button>
-                    <button type="button" onClick={() => setShowTeacherForm(false)} className="bg-slate-100 px-2 rounded-lg"><X className="w-4 h-4" /></button>
+                <form onSubmit={handleTeacherSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input type="text" value={teacherForm.name} onChange={e => setTeacherForm({...teacherForm, name: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="Nome" required />
+                    <input type="email" value={teacherForm.email} onChange={e => setTeacherForm({...teacherForm, email: e.target.value})} className="border rounded-lg p-2 text-sm" placeholder="E-mail" required />
+                    <input type="text" value={teacherForm.phone} onChange={e => setTeacherForm({...teacherForm, phone: formatPhone(e.target.value)})} className="border rounded-lg p-2 text-sm" placeholder="Telefone" required />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <select 
+                        value={teacherForm.modalityId} 
+                        onChange={e => setTeacherForm({...teacherForm, modalityId: e.target.value})} 
+                        className="border rounded-lg p-2 text-sm" 
+                        required
+                    >
+                        <option value="">Modalidade Principal...</option>
+                        {modalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                    <input type="text" value={teacherForm.password} onChange={e => setTeacherForm({...teacherForm, password: e.target.value})} className="border rounded-lg p-2 text-sm font-mono" placeholder="Senha Inicial" required />
+                    <div className="flex gap-2">
+                        <button type="submit" disabled={formLoading} className="bg-indigo-600 text-white px-4 rounded-lg text-sm font-bold flex-1">{formLoading ? '...' : 'Salvar'}</button>
+                        <button type="button" onClick={() => setShowTeacherForm(false)} className="bg-slate-100 px-4 rounded-lg text-sm font-medium">Cancelar</button>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -268,14 +345,26 @@ export const AdminPanel = () => {
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                 <table className="min-w-full divide-y divide-slate-200">
                     <thead className="bg-slate-50 font-bold text-slate-500 text-xs">
-                        <tr><th className="px-6 py-4 text-left">Nome</th><th className="px-6 py-4 text-left">Contato</th><th className="px-6 py-4 text-right">Ações</th></tr>
+                        <tr><th className="px-6 py-4 text-left">Nome</th><th className="px-6 py-4 text-left">Modalidade</th><th className="px-6 py-4 text-left">Contato</th><th className="px-6 py-4 text-right">Ações</th></tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
                         {teachers.map(t => (
                             <tr key={t.id} className="hover:bg-slate-50 text-sm">
                                 <td className="px-6 py-4 font-medium">{t.name}</td>
+                                <td className="px-6 py-4">
+                                    <span className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
+                                        {modalities.find(m => m.id === t.modalityId)?.name || 'N/A'}
+                                    </span>
+                                </td>
                                 <td className="px-6 py-4 text-slate-500">{t.email} | {t.phone}</td>
-                                <td className="px-6 py-4 text-right"><button onClick={() => deleteUser(t.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></td>
+                                <td className="px-6 py-4 text-right">
+                                  <button 
+                                    onClick={() => openDeleteModal('user', t.id, 'Desativar Professor', `Deseja realmente desativar o acesso do professor ${t.name}?`)} 
+                                    className="text-red-400 hover:text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
@@ -314,7 +403,14 @@ export const AdminPanel = () => {
                             <tr key={s.id} className="hover:bg-slate-50 text-sm">
                                 <td className="px-6 py-4 font-medium">{s.name}</td>
                                 <td className="px-6 py-4 text-slate-500">{s.email} | {s.phone}</td>
-                                <td className="px-6 py-4 text-right"><button onClick={() => deleteUser(s.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></td>
+                                <td className="px-6 py-4 text-right">
+                                  <button 
+                                    onClick={() => openDeleteModal('user', s.id, 'Desativar Aluno', `Deseja realmente desativar o acesso do aluno ${s.name}?`)} 
+                                    className="text-red-400 hover:text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
