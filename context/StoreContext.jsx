@@ -100,7 +100,15 @@ export const StoreProvider = ({ children }) => {
       if (mods) setModalities(mods.map(m => ({ id: m.id, name: m.name, description: m.description, imageUrl: m.image_url })));
       
       const { data: sess } = await supabase.from('class_sessions').select('*');
-      if (sess) setSessions(sess.map(s => ({ id: s.id, modalityId: s.modality_id, instructor: s.instructor, startTime: s.start_time, duration_minutes: s.duration_minutes, capacity: s.capacity, category: s.category })));
+      if (sess) setSessions(sess.map(s => ({ 
+        id: s.id, 
+        modalityId: s.modality_id, 
+        instructor: s.instructor, 
+        startTime: s.start_time, 
+        duration_minutes: s.duration_minutes, 
+        capacity: s.capacity, 
+        category: s.category || '' 
+      })));
       
       const { data: bks } = await supabase.from('bookings').select('*');
       if (bks) setBookings(bks.map(b => ({ id: b.id, sessionId: b.session_id, userId: b.user_id, status: b.status, bookedAt: b.booked_at })));
@@ -212,8 +220,7 @@ export const StoreProvider = ({ children }) => {
     const end = parseISO(endDate);
 
     while (current <= end) {
-      const day = current.getDay(); // 0-6 (Dom-Sab)
-      // Ajuste para o padrão solicitado: Seg=1, Ter=2 ... Dom=0
+      const day = current.getDay();
       if (daysOfWeek.includes(day)) {
         times.forEach(time => {
           const [hours, minutes] = time.split(':');
@@ -226,7 +233,7 @@ export const StoreProvider = ({ children }) => {
             start_time: sessionDate.toISOString(),
             duration_minutes: durationMinutes,
             capacity,
-            category
+            category: category
           });
         });
       }
@@ -244,7 +251,10 @@ export const StoreProvider = ({ children }) => {
       setSessions(prev => [...prev, ...withIds]);
     } else {
       const { error } = await supabase.from('class_sessions').insert(newSessions);
-      if (error) console.error("Erro ao criar lote:", error);
+      if (error) {
+          console.error("Erro ao criar lote:", error);
+          alert(`Erro no banco: ${error.message}. Certifique-se de que a coluna 'category' foi criada.`);
+      }
     }
     await fetchData();
   };
