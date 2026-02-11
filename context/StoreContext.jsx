@@ -275,6 +275,36 @@ export const StoreProvider = ({ children }) => {
     await fetchData();
   };
 
+  const promoteFromWaitlist = async (sessionId) => {
+    if (!supabase) {
+      const waitlistEntry = bookings
+        .filter(b => b.sessionId === sessionId && b.status === BookingStatus.WAITLIST)
+        .sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime())[0];
+      
+      if (waitlistEntry) {
+        setBookings(prev => prev.map(b => b.id === waitlistEntry.id ? { ...b, status: BookingStatus.CONFIRMED } : b));
+      }
+      return;
+    }
+    
+    // Busca o próximo da fila
+    const { data: nextInLine } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('status', BookingStatus.WAITLIST)
+      .order('booked_at', { ascending: true })
+      .limit(1)
+      .single();
+
+    if (nextInLine) {
+      await supabase
+        .from('bookings')
+        .update({ status: BookingStatus.CONFIRMED })
+        .eq('id', nextInLine.id);
+    }
+  };
+
   const deleteSession = async (id) => {
     if (!supabase) setSessions(sessions.filter(s => s.id !== id));
     else await supabase.from('class_sessions').delete().eq('id', id);
@@ -298,12 +328,20 @@ export const StoreProvider = ({ children }) => {
 
   const updateBookingStatus = async (id, status) => {
     try {
+      const booking = bookings.find(b => b.id === id);
       if (!supabase) {
         setBookings(bookings.map(b => b.id === id ? { ...b, status } : b));
       } else {
         const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
         if (error) throw error;
       }
+
+      // Se o status mudou de CONFIRMED para algo que libera vaga, promove o próximo
+      if (booking && booking.status === BookingStatus.CONFIRMED && 
+          (status === BookingStatus.CANCELLED || status === BookingStatus.MISSED)) {
+          await promoteFromWaitlist(booking.sessionId);
+      }
+      
       await fetchData();
     } catch (err) {
       console.error("Erro ao atualizar status da reserva:", err);
@@ -359,11 +397,16 @@ export const StoreProvider = ({ children }) => {
       bookSession: async (sid) => { 
         if (!currentUser) return false;
         try {
+          const session = sessions.find(s => s.id === sid);
+          const confirmedCount = getSessionBookingsCount(sid);
+          const isFull = confirmedCount >= (session?.capacity || 0);
+          const status = isFull ? BookingStatus.WAITLIST : BookingStatus.CONFIRMED;
+
           if (!supabase) { 
-            setBookings([...bookings, {id: Date.now().toString(), sessionId: sid, userId: currentUser.id, status: BookingStatus.CONFIRMED, bookedAt: new Date().toISOString()}]); 
+            setBookings([...bookings, {id: Date.now().toString(), sessionId: sid, userId: currentUser.id, status, bookedAt: new Date().toISOString()}]); 
             return true; 
           }
-          const { error } = await supabase.from('bookings').insert([{session_id: sid, user_id: currentUser.id, status: BookingStatus.CONFIRMED}]);
+          const { error } = await supabase.from('bookings').insert([{session_id: sid, user_id: currentUser.id, status}]);
           if (error) throw error;
           await fetchData(); 
           return true;
@@ -374,6 +417,7 @@ export const StoreProvider = ({ children }) => {
       },
       cancelBooking: async (bid) => {
         try {
+          const booking = bookings.find(b => b.id === bid);
           const status = BookingStatus.CANCELLED;
           if (!supabase) {
             setBookings(bookings.map(b => b.id === bid ? {...b, status} : b));
@@ -381,6 +425,12 @@ export const StoreProvider = ({ children }) => {
             const { error } = await supabase.from('bookings').update({ status }).eq('id', bid);
             if (error) throw error;
           }
+
+          // Se cancelou uma vaga confirmada, promove o próximo da fila
+          if (booking && booking.status === BookingStatus.CONFIRMED) {
+              await promoteFromWaitlist(booking.sessionId);
+          }
+
           await fetchData();
         } catch (err) {
           console.error("Erro ao cancelar reserva:", err);
