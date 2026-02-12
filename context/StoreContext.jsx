@@ -199,6 +199,53 @@ export const StoreProvider = ({ children }) => {
     }
   };
 
+  const updateUser = async (id, upd) => { 
+    if (!supabase) {
+      setUsers(users.map(u => u.id === id ? {...u, ...upd} : u));
+      if (currentUser?.id === id) setCurrentUser({...currentUser, ...upd});
+      await fetchData(); 
+      return true;
+    } 
+    
+    try {
+      // Verifica se houve alteração de email e chama a função RPC segura
+      const currentUserData = users.find(u => u.id === id);
+      if (upd.email && currentUserData && currentUserData.email !== upd.email) {
+         const { error: rpcError } = await supabase.rpc('admin_update_user_email', {
+           target_user_id: id,
+           new_email: upd.email
+         });
+         
+         if (rpcError) {
+           console.error("Erro ao atualizar Auth:", rpcError);
+           // Se a função não existir ou der erro (ex: email duplicado), lançamos erro
+           // e interrompemos a atualização do perfil para manter consistência.
+           throw new Error(`Erro na atualização de Auth: ${rpcError.message}`);
+         }
+      }
+
+      const payload = {};
+      if (upd.name !== undefined) payload.name = upd.name;
+      if (upd.phone !== undefined) payload.phone = upd.phone;
+      if (upd.email !== undefined) payload.email = upd.email;
+      if (upd.planType !== undefined) payload.plan_type = upd.planType;
+      if (upd.role !== undefined) payload.role = upd.role;
+      if (upd.modalityId !== undefined) payload.modality_id = upd.modalityId;
+      
+      const { error } = await supabase.from('profiles').update(payload).eq('id', id);
+      if (error) throw error;
+
+      if (currentUser?.id === id) await fetchUserProfile(id);
+      
+      await fetchData(); 
+      return true;
+    } catch (err) {
+      console.error("Erro ao atualizar usuário:", err);
+      // Retornar false permite que o componente de UI mostre uma mensagem de erro se necessário
+      return false;
+    }
+  };
+
   const updatePassword = async (newPassword) => {
       if (!supabase) {
           const updatedUser = { ...currentUser, mustChangePassword: false };
@@ -389,29 +436,10 @@ export const StoreProvider = ({ children }) => {
   return (
     <StoreContext.Provider value={{
       currentUser, users, modalities, sessions, bookings, loading, bookingReleaseHour, notificationsEnabled,
-      login, logout, addSession, updateSession, addSessionsBatch, deleteSession, deleteSessions, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, getWaitlistCount, updatePassword,
+      login, logout, addSession, updateSession, addSessionsBatch, deleteSession, deleteSessions, deleteModality, registerUser, updateBookingStatus, getStudentStats, requestNotificationPermission, getSessionBookingsCount, getWaitlistCount, updatePassword, updateUser,
       updateBookingReleaseHour: (h) => setBookingReleaseHour(parseInt(h)),
       addModality: async (d) => { if (!supabase) setModalities([...modalities, {...d, id: Date.now().toString()}]); else await supabase.from('modalities').insert([{name: d.name, description: d.description, image_url: d.imageUrl}]); fetchData(); },
       updateModality: async (id, d) => { if (!supabase) setModalities(modalities.map(m => m.id === id ? {...m, ...d} : m)); else await supabase.from('modalities').update({name: d.name, description: d.description, image_url: d.imageUrl}).eq('id', id); fetchData(); },
-      updateUser: async (id, upd) => { 
-        if (!supabase) {
-          setUsers(users.map(u => u.id === id ? {...u, ...upd} : u));
-          if (currentUser?.id === id) setCurrentUser({...currentUser, ...upd});
-        } else {
-          const payload = {};
-          if (upd.name !== undefined) payload.name = upd.name;
-          if (upd.phone !== undefined) payload.phone = upd.phone;
-          if (upd.email !== undefined) payload.email = upd.email;
-          if (upd.planType !== undefined) payload.plan_type = upd.planType;
-          if (upd.role !== undefined) payload.role = upd.role;
-          if (upd.modalityId !== undefined) payload.modality_id = upd.modalityId;
-          
-          await supabase.from('profiles').update(payload).eq('id', id);
-          if (currentUser?.id === id) await fetchUserProfile(id);
-        }
-        await fetchData(); 
-        return true;
-      },
       deleteUser: async (id) => { if (!supabase) setUsers(users.filter(u => u.id !== id)); else await supabase.from('profiles').update({role: UserRole.INACTIVE}).eq('id', id); fetchData(); },
       bookSession: async (sid) => { 
         if (!currentUser) return false;
