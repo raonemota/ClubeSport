@@ -12,7 +12,7 @@ export const TeacherPortal = () => {
 
   const mySessions = sessions.filter(s => 
     isSameDay(parseISO(s.startTime), viewDate) && 
-    (s.instructor === currentUser?.name || true)
+    s.instructor === currentUser?.name
   ).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   const currentSession = sessions.find(s => s.id === selectedSessionId);
@@ -72,7 +72,7 @@ export const TeacherPortal = () => {
         </div>
 
         <div className="lg:col-span-8">
-          {selectedSessionId ? (
+          {selectedSessionId && currentSession ? (
             <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500">
               <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                 <div>
