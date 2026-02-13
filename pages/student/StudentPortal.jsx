@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { CheckCircle, XCircle, Clock, Calendar as CalendarIcon, ChevronRight, Lock, Tag, AlertCircle, Bell, BellOff, ShieldAlert, Timer } from 'lucide-react';
-import { format, isPast, isToday, isTomorrow, addDays, differenceInCalendarDays, isSameDay } from 'date-fns';
+import { format, isPast, isToday, isTomorrow, addDays, differenceInCalendarDays, isSameDay, parseISO } from 'date-fns';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { FeedbackModal } from '../../components/FeedbackModal';
 import { BookingStatus } from '../../types.js';
@@ -17,22 +17,42 @@ const getStatusColor = (current, max) => {
 const DailyClassGroup = ({ date, modalityId, sessions, onBookSession }) => {
     const { modalities, getSessionBookingsCount, getWaitlistCount, bookings, currentUser, bookingReleaseHour } = useStore();
     const modality = modalities.find(m => m.id === modalityId);
-    const dateObj = new Date(sessions[0].startTime); 
+    
+    // Parse seguro da data
+    const dateObj = parseISO(sessions[0].startTime); 
     let dateLabel = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(dateObj);
+    
     const now = new Date();
     const isDayToday = isToday(dateObj);
     const isDayTomorrow = isTomorrow(dateObj);
-    if (isDayToday) dateLabel = "Hoje";
-    if (isDayTomorrow) dateLabel = "Amanhã";
+    // Verifica se é uma data futura (depois de amanhã)
+    const isFutureDate = !isDayToday && !isDayTomorrow && !isPast(dateObj);
 
+    if (isDayToday) dateLabel = "Hoje";
+    else if (isDayTomorrow) dateLabel = "Amanhã";
+
+    // Lógica de Bloqueio de Agendamento
     let isLocked = false;
-    if (!isDayTomorrow || now.getHours() >= bookingReleaseHour) isLocked = false;
-    else if (isDayTomorrow) isLocked = true;
+    let lockMessage = "";
+
+    if (isDayToday) {
+        isLocked = false;
+    } else if (isDayTomorrow) {
+        // Bloqueia amanhã se ainda não chegou a hora de liberação
+        if (now.getHours() < bookingReleaseHour) {
+             isLocked = true;
+             lockMessage = `Inscrições abrem às ${bookingReleaseHour.toString().padStart(2, '0')}:00`;
+        }
+    } else if (isFutureDate) {
+        // Bloqueia dias depois de amanhã
+        isLocked = true;
+        lockMessage = "Inscrições abrem no dia anterior";
+    }
 
     const sortedSessions = [...sessions].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
     return (
-        <div className={`bg-white rounded-2xl shadow-sm border overflow-hidden mb-6 ${isLocked ? 'border-orange-100 opacity-80' : 'border-slate-100'}`}>
+        <div className={`bg-white rounded-2xl shadow-sm border overflow-hidden mb-6 ${isLocked ? 'border-orange-100 opacity-90' : 'border-slate-100'}`}>
             <div className="flex flex-col md:flex-row">
                 <div className="md:w-72 bg-slate-100 relative h-40 md:h-auto overflow-hidden flex-shrink-0">
                     <img src={modality?.imageUrl} alt={modality?.name} className={`w-full h-full object-cover ${isLocked ? 'grayscale' : ''}`} />
@@ -42,8 +62,8 @@ const DailyClassGroup = ({ date, modalityId, sessions, onBookSession }) => {
                     </div>
                 </div>
                 <div className="flex-1 p-6 bg-white">
-                    {isLocked && (
-                        <div className="mb-4 bg-orange-50 text-orange-800 text-xs font-black p-3 rounded-xl border border-orange-100 uppercase tracking-widest text-center">Inscrições abrem às {bookingReleaseHour.toString().padStart(2, '0')}:00</div>
+                    {isLocked && lockMessage && (
+                        <div className="mb-4 bg-orange-50 text-orange-800 text-xs font-black p-3 rounded-xl border border-orange-100 uppercase tracking-widest text-center">{lockMessage}</div>
                     )}
                     <div className="space-y-3">
                         {sortedSessions.map(session => {
@@ -57,7 +77,7 @@ const DailyClassGroup = ({ date, modalityId, sessions, onBookSession }) => {
                             return (
                                 <div key={session.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border bg-slate-50 gap-4 border-slate-100 hover:border-indigo-100 transition-all">
                                     <div className="flex items-center gap-4">
-                                        <div className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-center min-w-[70px] font-black text-lg text-slate-800 shadow-sm">{format(new Date(session.startTime), 'HH:mm')}</div>
+                                        <div className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-center min-w-[70px] font-black text-lg text-slate-800 shadow-sm">{format(parseISO(session.startTime), 'HH:mm')}</div>
                                         <div>
                                             <p className="text-base font-black text-slate-800 leading-tight">{session.instructor} {session.category && <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-lg uppercase font-black ml-2 tracking-tight">{session.category}</span>}</p>
                                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
@@ -84,7 +104,7 @@ const DailyClassGroup = ({ date, modalityId, sessions, onBookSession }) => {
                                     >
                                         {isBookedByUser ? <><CheckCircle className="w-5 h-5" /> Confirmado</> : 
                                          isWaitlisted ? <><Timer className="w-5 h-5" /> Na Fila</> :
-                                         isLocked ? 'Bloqueado' : 
+                                         isLocked ? 'Aguarde' : 
                                          isFull ? 'Fila de Espera' : 'Reservar Vaga'}
                                     </button>
                                 </div>
@@ -100,7 +120,7 @@ const DailyClassGroup = ({ date, modalityId, sessions, onBookSession }) => {
 const MyBookingCard = ({ session, bookingId, status, onRequestCancel }) => {
   const { modalities } = useStore();
   const modality = modalities.find(m => m.id === session.modalityId);
-  const date = new Date(session.startTime);
+  const date = parseISO(session.startTime);
   const isCancelled = status.includes('CANCELLED');
   const isWaitlisted = status === BookingStatus.WAITLIST;
 
@@ -162,14 +182,17 @@ export const StudentPortal = () => {
   const filteredSessions = sessions
     .filter(s => filterModality === 'all' || s.modalityId === filterModality)
     .filter(s => {
-        const sDate = new Date(s.startTime);
-        return isToday(sDate) || isTomorrow(sDate);
+        const sDate = parseISO(s.startTime);
+        // Exibe aulas de hoje e todas as datas futuras
+        // 'isToday' garante que aulas de hoje (mesmo que a hora tenha passado) sejam exibidas
+        // '!isPast' garante que qualquer data futura seja exibida
+        return isToday(sDate) || !isPast(sDate);
     })
     .sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   const groupedSessions = filteredSessions.reduce((acc, session) => {
-      const groupKey = `${format(new Date(session.startTime), 'yyyy-MM-dd')}_${session.modalityId}`;
-      if (!acc[groupKey]) acc[groupKey] = { date: format(new Date(session.startTime), 'yyyy-MM-dd'), modalityId: session.modalityId, sessions: [] };
+      const groupKey = `${format(parseISO(session.startTime), 'yyyy-MM-dd')}_${session.modalityId}`;
+      if (!acc[groupKey]) acc[groupKey] = { date: format(parseISO(session.startTime), 'yyyy-MM-dd'), modalityId: session.modalityId, sessions: [] };
       acc[groupKey].sessions.push(session);
       return acc;
   }, {});
@@ -238,7 +261,8 @@ export const StudentPortal = () => {
             ) : (
                 <div className="text-center py-28 bg-white rounded-2xl border border-dashed border-slate-200 shadow-inner">
                     <CalendarIcon className="w-16 h-16 mx-auto mb-4 text-slate-100" />
-                    <p className="font-black text-slate-300 uppercase text-sm tracking-widest">Nenhuma aula agendada para este filtro</p>
+                    <p className="font-black text-slate-300 uppercase text-sm tracking-widest">Nenhuma aula disponível</p>
+                    <p className="text-xs text-slate-400 mt-2">Aguarde a liberação de novos horários</p>
                 </div>
             )}
         </div>
