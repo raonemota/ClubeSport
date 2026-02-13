@@ -123,6 +123,7 @@ const MyBookingCard = ({ session, bookingId, status, onRequestCancel }) => {
   const date = parseISO(session.startTime);
   const isCancelled = status.includes('CANCELLED');
   const isWaitlisted = status === BookingStatus.WAITLIST;
+  const hasPassed = isPast(date);
 
   const formattedDate = new Intl.DateTimeFormat('pt-BR', { 
     weekday: 'long', 
@@ -131,21 +132,25 @@ const MyBookingCard = ({ session, bookingId, status, onRequestCancel }) => {
   }).format(date);
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group hover:shadow-xl transition-all duration-300 ${isCancelled ? 'opacity-60 grayscale' : ''} ${isWaitlisted ? 'ring-2 ring-orange-100' : ''}`}>
+    <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group hover:shadow-xl transition-all duration-300 ${isCancelled || hasPassed ? 'opacity-80 grayscale-[0.5]' : ''} ${isWaitlisted ? 'ring-2 ring-orange-100' : ''}`}>
       <div className="h-28 bg-slate-200 relative overflow-hidden">
            <img src={modality?.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
            <div className="absolute inset-0 bg-black/60 flex items-center px-6">
               <span className="text-white font-black text-base uppercase tracking-widest">{modality?.name}</span>
            </div>
-           {(isCancelled || isWaitlisted) && (
+           {(isCancelled || isWaitlisted || hasPassed) && (
                <div className="absolute top-3 right-3">
                    {isWaitlisted ? (
                       <span className="bg-orange-600 text-white text-[11px] font-black px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-xl border border-orange-400">
                         <Timer className="w-4 h-4" /> FILA DE ESPERA
                       </span>
-                   ) : (
+                   ) : isCancelled ? (
                       <span className="bg-red-600 text-white text-[11px] font-black px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-xl border border-red-400">
                           <XCircle className="w-4 h-4" /> CANCELADO
+                      </span>
+                   ) : hasPassed && (
+                      <span className="bg-slate-600 text-white text-[11px] font-black px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-xl border border-slate-500">
+                          <CheckCircle className="w-4 h-4" /> FINALIZADA
                       </span>
                    )}
                </div>
@@ -158,7 +163,11 @@ const MyBookingCard = ({ session, bookingId, status, onRequestCancel }) => {
               <p className="text-sm text-slate-500 font-bold uppercase tracking-tight">{session.instructor} {session.category && <span className="text-slate-300 mx-1">|</span>} {session.category}</p>
           </div>
           {!isCancelled ? (
-            <button onClick={() => onRequestCancel(bookingId)} className="w-full py-3 bg-slate-50 border border-red-100 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-colors shadow-sm">Cancelar Presença</button>
+            hasPassed ? (
+               <div className="text-center p-3 rounded-xl bg-slate-100 text-xs text-slate-500 font-black uppercase tracking-widest border border-slate-200">Aula Finalizada</div>
+            ) : (
+               <button onClick={() => onRequestCancel(bookingId)} className="w-full py-3 bg-slate-50 border border-red-100 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-colors shadow-sm">Cancelar Presença</button>
+            )
           ) : (
             <div className="text-center p-3 rounded-xl bg-slate-50 text-xs text-slate-400 font-black uppercase tracking-widest border border-slate-100 shadow-inner">Reserva Cancelada</div>
           )}
